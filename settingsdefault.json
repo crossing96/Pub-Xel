@@ -1,0 +1,16 @@
+{
+    "mainlib_path": "",
+    "seclib_path": [],
+    "output_path": "",
+    "seclib_enable": 0,
+    "run_count": 0,
+    "message": "A",
+    "developerMode": 0,
+    "hotkey_open_value" : "<Alt>+<Shift>+k",
+    "hotkey_inspect_value" : "<Alt>+<Shift>+j",
+    "launch_at_startup": 0,
+    "close_to_system_tray": 1,
+    "esc_to_system_tray": 1,
+    "system_tray_notice_shown": 0,
+    "worksheet_count": 0
+}

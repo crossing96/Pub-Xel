@@ -1,0 +1,9 @@
+.DS_Store
+__pycache__/
+trashbin/
+build/
+dist/
+software.txt
+Pub-Xel.spec
+setup.iss
+LICENSE.txt
