@@ -3,6 +3,7 @@ __pycache__/
 trashbin/
 build/
 dist/
+Output/
 software.txt
 Pub-Xel.spec
 setup.iss
