@@ -1315,12 +1315,23 @@ def check_shortcut(worker):
             hotkey_k.release(key)
         return
 
-    listener = keyboard.Listener(
-        on_press=for_canonical(on_press),
-        on_release=for_canonical(on_release))
+    def start_listener():
+        try:
+            listener = keyboard.Listener(
+                on_press=for_canonical(on_press),
+                on_release=for_canonical(on_release))
+            listeners.append(listener)
+            listener.start()
+            print("Listener started successfully")
+        except Exception as e:
+            print(f"Error starting listener: {e}")
 
-    listeners.append(listener)
-    listener.start()
+    print("listener_thread = threading.Thread(target=start_listener)")
+    listener_thread = threading.Thread(target=start_listener)
+    print("listener_thread.daemon = True")
+    listener_thread.daemon = True  # Ensure the thread exits when the main program exits
+    print("listener_thread.start()")
+    listener_thread.start()
 
 
 class SystemTrayIcon(QSystemTrayIcon):
@@ -1915,23 +1926,32 @@ if __name__ == '__main__':
 
     main_window = main_window()
 
-    if settings.get('hotkey_open_value', 0) or settings.get('hotkey_inspect_value', 0):
-        worker = listenerWorker()
-        worker.open_inspect_signal.connect(main_window.open_inspect_window)
-        worker.open_file_signal.connect(main_window.main_openfile)
-        # Start the shortcut detection in the main thread
-        print("starting shortcut thread")
-        shortcut_thread = threading.Thread(target=check_shortcut, args=(worker,))
-        shortcut_thread.start()
-
+if settings.get('hotkey_open_value', 0) or settings.get('hotkey_inspect_value', 0):
+    worker = listenerWorker()
+    worker.open_inspect_signal.connect(main_window.open_inspect_window)
+    worker.open_file_signal.connect(main_window.main_openfile)
+    # Start the shortcut detection in the main thread
+    print("starting shortcut thread")
+    try:
+        check_shortcut(worker)
+        # shortcut_thread = threading.Thread(target=check_shortcut, args=(worker,))
+        # shortcut_thread.start()
+        print("shortcut_thread started successfully")
+    except Exception as e:
+        print(f"Error starting shortcut_thread: {e}")
+    
+    print("close loading screen")
     close_loading_screen()
+    print("main_window show")
     main_window.show()
 
+
     if settings['run_count'] == 0:
+        print("welcomewindow")
         from welcome import WelcomeDialog
         main_window.welcome_dialog = WelcomeDialog()
         main_window.welcome_dialog.exec()
-
+        
     main_window.activateWindow()
 
     # increase run count
