@@ -21,7 +21,12 @@ from PyQt6.QtGui import QPixmap, QFont
 import os
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-welcome1_path = os.path.join(script_dir, 'welcome1.png')
+assets_dir = os.path.join(script_dir, 'assets')
+src_dir = os.path.join(script_dir, 'src')
+ui_dir = os.path.join(script_dir, 'ui')
+data_dir = os.path.join(script_dir, 'data')
+
+welcome1_path = os.path.join(assets_dir, 'welcome1.png')
 
 class WelcomeDialog(QDialog):
     def __init__(self):

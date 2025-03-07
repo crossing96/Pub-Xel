@@ -31,11 +31,12 @@ if os_name == "Windows" or os_name == "Darwin":
 else:
     raise Exception("Unsupported operating system")
 
-
 # Get the directory of the current script
 script_dir = os.path.dirname(os.path.abspath(__file__))
-# Build the full path to the file
-lock_file_path = os.path.join(script_dir, 'my_script.lock')
+assets_dir = os.path.join(script_dir, 'assets')
+src_dir = os.path.join(script_dir, 'src')
+ui_dir = os.path.join(script_dir, 'ui')
+data_dir = os.path.join(script_dir, 'data')
 #version
 version = "1.0.0"
 
@@ -78,8 +79,7 @@ else :
 # Function to create and display the loading screen
 def show_loading_screen():
     global splash
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    loading_image_path = os.path.join(script_dir, 'loading.png')
+    loading_image_path = os.path.join(assets_dir, 'loading.png')
     pixmap = QPixmap(loading_image_path)
     pixmap = pixmap.scaled(500, 500, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
     splash = QSplashScreen(pixmap, Qt.WindowType.WindowStaysOnTopHint)
@@ -87,7 +87,6 @@ def show_loading_screen():
     splash.show()
     splash.activateWindow()
     splash.raise_()
-
 
 # Show the loading screen
 show_loading_screen()
@@ -123,30 +122,33 @@ from PyQt6.QtCore import QPropertyAnimation, QEventLoop,QThread, QUrl, QEvent, Q
 from PyQt6 import uic
 
 # Build the full path to the file
-main_path = os.path.join(script_dir, 'main.ui')
-inspect_path = os.path.join(script_dir, 'inspect.ui')
-about_path = os.path.join(script_dir, 'about.ui')
-preferences_path = os.path.join(script_dir, 'preferences.ui')
-icon_path = os.path.join(script_dir, 'logo64.ico')
-questionmark_icon_path = os.path.join(script_dir, 'questionmark.png')
-loading_image_path = os.path.join(script_dir, 'loading.png')
-settingsdefault_path = os.path.join(script_dir, 'settingsdefault.json')
-pubxelworksheetdefault_path = os.path.join(script_dir, 'pubsheet.xlsx')
+main_path = os.path.join(ui_dir, 'main.ui')
+inspect_path = os.path.join(ui_dir, 'inspect.ui')
+about_path = os.path.join(ui_dir, 'about.ui')
+preferences_path = os.path.join(ui_dir, 'preferences.ui')
+icon_path = os.path.join(assets_dir, 'logo64.ico')
+questionmark_icon_path = os.path.join(assets_dir, 'questionmark.png')
+loading_image_path = os.path.join(assets_dir, 'loading.png')
+settingsdefault_path = os.path.join(data_dir, 'settingsdefault.json')
+pubsheetdefault_path = os.path.join(data_dir, 'pubsheet.xlsx')
+pubsheetinitialdefault_path = os.path.join(data_dir, 'pubsheetinitial.xlsx')
 #settings
 settings_path = os.path.join(appdatadir,"settings.json")
 #worksheet
-pubxelworksheet_path = os.path.join(appdatadir, 'pubsheet.xlsx')
+pubsheet_path = os.path.join(appdatadir, 'pubsheet.xlsx')
+pubsheetinitial_path = os.path.join(appdatadir, 'pubsheetinitial.xlsx')
 
 
 #Copy files to Application Folder.
 files_to_copy = {
     settingsdefault_path: settings_path,  # Copy to settings.json
-    pubxelworksheetdefault_path: pubxelworksheet_path  # Copy to pubsheet.xlsx
+    pubsheetdefault_path: pubsheet_path,  # Copy to pubsheet.xlsx
+    pubsheetinitialdefault_path: pubsheetinitial_path  # Copy to pubsheet.xlsx
 }
 for source_path, dest_path in files_to_copy.items():
-    if dest_path == pubxelworksheet_path or not os.path.exists(dest_path):
+    if dest_path == pubsheet_path or dest_path == pubsheetinitial_path or not os.path.exists(dest_path):
         shutil.copy(source_path, dest_path)
-        print(f"Copied {source_path} as {dest_path} (Overwrite: {dest_path == pubxelworksheet_path})")
+        print(f"Copied {source_path} as {dest_path}")
 
 #update the settings
 def update_settings(settingsdefault_path, settings_path):
@@ -202,6 +204,11 @@ if settings.get('seclib_enable',0):
 else:
     seclibdir = []
 
+#disable hotkeys for now in Mac
+if os_name == "Darwin":
+    settings = save_settings_key(settings,"hotkey_inspect_value","")
+    settings = save_settings_key(settings,"hotkey_open_value","")
+
 #other settings
 system_tray_notice_shown = settings.get('system_tray_notice_shown', 0)
 developerMode = settings.get('developerMode',0)
@@ -229,7 +236,8 @@ def dirname(p):
 def open_directory(dir):
     os_name = platform.system()
     if os_name == 'Windows':  # Windows
-        subprocess.Popen(f'start "" "{dir}"', start_new_session=True, shell=True,creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
+        os.startfile(dir)
+        # subprocess.Popen(f'start "" "{dir}"', start_new_session=True, shell=True,creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP)
     elif os_name == 'Darwin':  # macOS
         print(f'open {shlex.quote(dir)}')
         subprocess.call(f'open {shlex.quote(dir)}', shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
@@ -672,6 +680,7 @@ class window_inspect(QWidget):
         global action_in_progress
         action_in_progress = True
         print("action_in_progress True")
+        self.setWindowIcon(QIcon(icon_path))
         self.hide()
         parent.setEnabled(False)  # Disable the main window
         self.pseudo_parent = parent
@@ -1221,7 +1230,6 @@ class clipboardWorker(QThread):
             print(f"Error accessing clipboard: {e}")
         return ""
 
-
 class excelWorker(QThread):
     excel_updated = pyqtSignal(str)
     def run(self):
@@ -1259,7 +1267,7 @@ class excelWorker(QThread):
                 print(f"Error accessing workbook or range: {e}")
             if wb is not None and rng is not None:
                 cellcount = rng.count
-                text = f"{cellcount} cell{'s' if cellcount > 1 else ''} in {os.path.basename(wb.fullname)}."
+                text = f"{cellcount} Cell{'s' if cellcount > 1 else ''} in {os.path.basename(wb.fullname)}."
             else: 
                 text = ""
             return text
@@ -1553,7 +1561,7 @@ class main_window(QMainWindow):
             self.findChild(QAction, 'actionMinimize').triggered.connect(self.showMinimized)
         self.findChild(QAction, 'actionOpen_Library_Folder').triggered.connect(lambda: try_open_directory(mainlibdir))
         self.findChild(QAction, 'actionOpen_Output_Folder').triggered.connect(lambda: try_open_directory(outdir))
-        self.findChild(QAction, 'actionNew_Excel_Template').triggered.connect(self.save_pubxelworksheet)
+        self.findChild(QAction, 'actionNew_Excel_Template').triggered.connect(self.save_pubsheet)
         self.findChild(QAction, 'actionPreferences').triggered.connect(self.open_preferences)
         self.findChild(QAction, 'actionAbout').triggered.connect(self.open_about_window)
 
@@ -1652,7 +1660,7 @@ class main_window(QMainWindow):
     def handle_exit_main_window(self):
         self.exitstatus = True
 
-    def save_pubxelworksheet(self):
+    def save_pubsheet(self):
         global action_in_progress
         if action_in_progress:
             return
@@ -1664,13 +1672,24 @@ class main_window(QMainWindow):
         file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
         file_dialog.setDefaultSuffix("xlsx")
         file_dialog.setNameFilters(["Excel Files (*.xlsx)", "All Files (*)"])
+
+        try:
+            # Set the initial directory to documents_path
+            documents_path = os.path.expanduser("~/Documents")
+            file_dialog.setDirectory(documents_path)
+        except Exception as e:
+            print(f"Failed to set initial directory: {e}")
+
         file_dialog.selectFile("Pub-Xel Worksheet.xlsx")
 
         if file_dialog.exec() == QFileDialog.DialogCode.Accepted:
             file_path = file_dialog.selectedFiles()[0]
 
             try:
-                shutil.copyfile(pubxelworksheet_path, file_path)
+                if settings["worksheet_count"] > 0:
+                    shutil.copyfile(pubsheet_path, file_path)
+                else:
+                    shutil.copyfile(pubsheetinitial_path, file_path)
                 self.save_success_dialog(file_path)
 
             except Exception as e:
@@ -1684,6 +1703,7 @@ class main_window(QMainWindow):
         raise Exception("Crash")
     
     def save_success_dialog(self, file_path):
+        global settings
         msg_box = QMessageBox(self)
         msg_box.setIcon(QMessageBox.Icon.Information)
         msg_box.setText("Worksheet saved.")
@@ -1707,8 +1727,7 @@ class main_window(QMainWindow):
                 folder_path = os.path.dirname(file_path)
                 try_open_directory(folder_path)
 
-        settings['worksheet_count'] += 1
-        save_settings_key("worksheet_count",settings['worksheet_count'])
+        settings = save_settings_key(settings,"worksheet_count",settings['worksheet_count']+1)
 
     def run_check_file_exist2(self):
         global action_in_progress
@@ -1798,6 +1817,7 @@ class main_window(QMainWindow):
     if os_name == "Windows": # dont change self.is_closing and system_tray_notice_shown orders
         def minimize_to_tray(self):
             global system_tray_notice_shown
+            global settings
             self.hide()
             self.tray_icon.show()
             if self.is_closing:
@@ -1815,7 +1835,7 @@ class main_window(QMainWindow):
                 except Exception as e:
                     print(f"Failed to show system tray notice: {e}")
                 system_tray_notice_shown += 1
-                save_settings_key('system_tray_notice_shown',1)
+                settings = save_settings_key(settings,'system_tray_notice_shown',1)
     else:
         def minimize_to_tray(self):
             return
@@ -1955,8 +1975,7 @@ if settings.get('hotkey_open_value', 0) or settings.get('hotkey_inspect_value', 
     main_window.activateWindow()
 
     # increase run count
-    settings['run_count'] = settings.get('run_count', 0) + 1
-    save_settings_key('run_count', settings['run_count'])
+    settings = save_settings_key(settings, 'run_count', settings['run_count']+1)
 
     try:
         sys.exit(app.exec())

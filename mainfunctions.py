@@ -43,10 +43,10 @@ def save_settings(settings):
     with open(settings_path, 'w') as file:
         json.dump(settings, file, indent=4)
 
-def save_settings_key(key, value):
-    settings = load_settings()
+def save_settings_key(settings, key, value):
     settings[key] = value
     save_settings(settings)
+    return settings
 
 def set_preserve_order(input_list):
     seen = set()
@@ -94,7 +94,7 @@ def string_to_list(input):
     input = list(set_preserve_order(input))
     return input
 
-def list_to_string(list,chr=60): #accepts string_to_list outcomes. duplicates already removed.  
+def list_to_string(list,chr=60): #accepts string_to_list outcomes. assumes that duplicates already removed.  
     if list is None:
         return ""
     # Check if the list is empty
@@ -106,10 +106,11 @@ def list_to_string(list,chr=60): #accepts string_to_list outcomes. duplicates al
         list = list[:3]
         longlist = True
     # Concatenate the list with each elements wrapped in <>
-    string = f"{listlength} selection{'s' if listlength > 1 else ''}: "+"<" + "> <".join(list) + ">"
+    string = f"{listlength} Selection{'s' if listlength > 1 else ''}: "+"<" + "> <".join(list) + ">"
     if len(string) > chr and string.count(">")>1:
         #remove the last <>
         string = string[:string.rfind(">",0,len(string)-1)+1]
+        longlist = True
     if len(string) > chr and string.count(">")>1:
         #remove the last <>
         string = string[:string.rfind(">",0,len(string)-1)+1]
@@ -607,6 +608,7 @@ def input_pubmed_data():
     #impact factor 파일 업데이트 하면 맨앞 맨끝 문자 정리좀 해주셈
     # Get the directory of the current script
     script_dir = os.path.dirname(os.path.abspath(__file__))
+    data_dir = os.path.join(script_dir, 'data')
 
     impactfactor2022 = {}
     impactfactor2023 = {}
@@ -614,7 +616,7 @@ def input_pubmed_data():
     #IF2022
     importIF2022 = header2.get("if2022",-1)>=0 or header2.get("cite2022",-1)>=0
     if importIF2022:
-        IF2022_path = os.path.join(script_dir, 'impactfactor2022.txt')
+        IF2022_path = os.path.join(data_dir, 'impactfactor2022.txt')
         print("load IF2022")
         with open(IF2022_path, "r", encoding="utf8") as file:
             lines = file.readlines()
@@ -627,7 +629,7 @@ def input_pubmed_data():
     #IF2023
     importIF2023 = header2.get("if2023",-1)>=0 or header2.get("cite2023",-1)>=0
     if importIF2023:
-        IF2023_path = os.path.join(script_dir, 'impactfactor2023.txt')
+        IF2023_path = os.path.join(data_dir, 'impactfactor2023.txt')
         print("load IF2023")
         with open(IF2023_path, "r", encoding="utf8") as file:
             lines = file.readlines()
