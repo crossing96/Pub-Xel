@@ -37,7 +37,7 @@ jobs:
 
       - name: Create DMG with Versioning
         run: |
-          VERSION=$(git describe --tags --abbrev=0)  # Get the version from Git tags
+          VERSION=$(git describe --tags --abbrev=0 || echo "0.0.0")  # Get the version from Git tags or set default
           create-dmg dist/Pub-Xel.app \
             --dmg-title="Pub-Xel Installer" \
             --overwrite \
@@ -48,10 +48,3 @@ jobs:
             --window-size=500x350 \
             --icon="Pub-Xel.app"=100,150 \
             --app-drop-link=350,150
-
-      - name: Upload DMG to Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: "Pub-Xel_*.dmg"
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }} 
