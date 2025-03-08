@@ -1,10 +1,10 @@
-name: Build and Release Pub-Xel
+name: Build and Release Pub-Xel macOS
 
 on:
   release:
     types: [published]  # Trigger the workflow when a new release is published
   workflow_dispatch:  # Allow manual triggering of the workflow
-  
+
 jobs:
   build-macos:
     runs-on: macos-latest  # Runs on GitHub's macOS virtual machine
@@ -48,3 +48,10 @@ jobs:
             --window-size=500x350 \
             --icon="Pub-Xel.app"=100,150 \
             --app-drop-link=350,150
+
+      - name: Upload DMG to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: "Pub-Xel_*.dmg"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
