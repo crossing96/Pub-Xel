@@ -278,6 +278,11 @@ class window_preferences(QDialog):
         global settings
         self.settings = settings
         self.tabWidget.setCurrentIndex(0)
+        self.tab_hot = self.findChild(QWidget, 'tab_hot')
+        if self.tab_hot and os_name == "Darwin":
+            print("Hotkeys tab disabled in MacOS")
+            index_to_hide = self.tabWidget.indexOf(self.tab_hot)
+            self.tabWidget.removeTab(index_to_hide)
         
         # library tab
         self.plainTextEdit_mainlib = self.findChild(QPlainTextEdit, 'plainTextEdit_mainlib')
@@ -1128,10 +1133,8 @@ class window_inspect(QWidget):
             open_folder_button.clicked.connect(lambda: open_newdir())
             msg_box.setWindowModality(QtCore.Qt.WindowModality.ApplicationModal)
             msg_box.exec()
-        
         show_message_box()
         return True
-
 
     def create_elements(self, layout: QGridLayout, row: int, label: str, button1: str, button2: str=None):
         # Create a QLabel and add it to the layout
@@ -1347,15 +1350,14 @@ class SystemTrayIcon(QSystemTrayIcon):
         super().__init__(parent)
         self.setIcon(QIcon(icon_path))
         self.setToolTip("Pub-Xel")
-        self.activated.connect(self.on_activated)
+        if os_name == "Windows":
+            self.activated.connect(self.on_activated)
 
         self.menu = QMenu(parent)
         self.restore_action = QAction("Restore", self)
         self.exit_action = QAction("Exit", self)
-
         self.restore_action.triggered.connect(self.on_restore)
         self.exit_action.triggered.connect(self.on_exit)
-
         self.menu.addAction(self.restore_action)
         self.menu.addAction(self.exit_action)
         self.setContextMenu(self.menu)
@@ -1373,7 +1375,6 @@ class SystemTrayIcon(QSystemTrayIcon):
 
     def on_exit(self):
         self.parent().close_application()
-
 
 class PopupWidgettest(QWidget):
     popup_count = 0  # Class variable to keep track of the number of popups
@@ -1495,7 +1496,7 @@ class main_window(QMainWindow):
             self.layout_developer.addWidget(self.button3)
             self.button1.clicked.connect(self.action_in_progress_switch)
             self.button2.clicked.connect(self.crash)
-            self.button3.clicked.connect(self.crash)
+            self.button3.clicked.connect(self.button3_clicked)
 
         self.button_checkfiles.clicked.connect(self.run_check_file_exist2)
         self.button_import.clicked.connect(self.run_input_pubmed_data2)
@@ -1552,13 +1553,10 @@ class main_window(QMainWindow):
         self.excelWorker_running = False
 
         self.findChild(QAction, 'actionExit').triggered.connect(self.close_application)
-        if os_name == "Windows":
-            self.findChild(QAction, 'actionMinimize').triggered.connect(self.minimize_to_tray)
-            if settings.get('esc_to_system_tray',0):
-                shortcut_Esc = QShortcut(QKeySequence('Esc'), self)
-                shortcut_Esc.activated.connect(self.minimize_to_tray) 
-        if os_name == "Darwin":
-            self.findChild(QAction, 'actionMinimize').triggered.connect(self.showMinimized)
+        self.findChild(QAction, 'actionMinimize').triggered.connect(self.minimize_to_tray)
+        if settings.get('esc_to_system_tray',0):
+            shortcut_Esc = QShortcut(QKeySequence('Esc'), self)
+            shortcut_Esc.activated.connect(self.minimize_to_tray) 
         self.findChild(QAction, 'actionOpen_Library_Folder').triggered.connect(lambda: try_open_directory(mainlibdir))
         self.findChild(QAction, 'actionOpen_Output_Folder').triggered.connect(lambda: try_open_directory(outdir))
         self.findChild(QAction, 'actionNew_Excel_Template').triggered.connect(self.save_pubsheet)
@@ -1568,9 +1566,30 @@ class main_window(QMainWindow):
         self.setStyleSheet("""QGroupBox#groupBoxExcel {font-size: 14px;}
                            QGroupBox#groupBoxClipboard {font-size: 14px;}""")
 
-        if os_name == "Windows":
-            self.tray_icon = SystemTrayIcon(self)
-            self.tray_icon.hide()
+
+        self.tray_icon = SystemTrayIcon(self)
+        self.tray_icon.hide()
+
+    def button3_clicked(self):
+        def on_press(key):
+            try:
+                if key.char == 'a':  # Replace 'a' with the key you want to listen for
+                    print("Key 'a' pressed")
+            except AttributeError:
+                pass
+        def on_release(key):
+            if key == keyboard.Key.esc:
+                # Stop listener
+                return False
+        # Collect events until released
+        listener = keyboard.Listener(on_press=on_press, on_release=on_release)
+        listener.start()
+        # Stop the listener after 1 second
+        def stop_listener():
+            listener.stop()
+            print("Listener stopped after 1 second")
+        timer = threading.Timer(1.0, stop_listener)
+        timer.start()
 
     def update_excel_current(self):
         if not self.excelWorker_running:
@@ -1622,9 +1641,22 @@ class main_window(QMainWindow):
         self.update_clipboard_current()
     def event(self, event):
         if event.type() == QtCore.QEvent.Type.WindowActivate:
+            print("WindowActivate event detected")
             self.update_excel_current()
             self.update_clipboard_current()
+        if os_name == "Darwin":
+            if event.type() == QEvent.Type.ApplicationActivate:
+                print("ApplicationActivate event detected")
+                self.on_application_activate()
         return super().event(event)
+
+    def on_application_activate(self):
+        if os_name == "Darwin":
+            print("Application activated from Dock")
+            self.show()
+            self.activateWindow()
+        else:
+            return
 
     def open_about_window(self):
         global action_in_progress
@@ -1633,7 +1665,6 @@ class main_window(QMainWindow):
         action_in_progress=True
         print("action_in_progress True")
         self.setEnabled(False)  # Disable the main window
-
         dialog = window_about(self)
         dialog.exec()  # This will block until the dialog is closed
         action_in_progress = False
@@ -1647,7 +1678,6 @@ class main_window(QMainWindow):
         action_in_progress=True
         print("action_in_progress True")
         self.setEnabled(False)  # Disable the main window
-
         dialog = window_preferences(self)
         dialog.exit_main_window.connect(self.handle_exit_main_window)  # Connect the signal before exec()
         dialog.exec()  # This will block until the dialog is closed
@@ -1814,43 +1844,32 @@ class main_window(QMainWindow):
     def show_popup_instructionsClipboard(self, event):
         self.show_popup(self.label_q2,self.instructionsClipboard)
 
-    if os_name == "Windows": # dont change self.is_closing and system_tray_notice_shown orders
-        def minimize_to_tray(self):
-            global system_tray_notice_shown
-            global settings
-            self.hide()
-            self.tray_icon.show()
-            if self.is_closing:
-                return
-            if system_tray_notice_shown:
-                return
-            else:
-                try:
-                    self.tray_icon.showMessage(
-                        "Notice",
-                        "Pub-Xel will continue running in the background. This behavior can be changed in the Preferences menu.",
-                        QSystemTrayIcon.MessageIcon.Information,
-                        5000  # Duration in milliseconds
-                        )
-                except Exception as e:
-                    print(f"Failed to show system tray notice: {e}")
-                system_tray_notice_shown += 1
-                settings = save_settings_key(settings,'system_tray_notice_shown',1)
-    else:
-        def minimize_to_tray(self):
+    def minimize_to_tray(self):# dont change self.is_closing and system_tray_notice_shown orders
+        global system_tray_notice_shown
+        global settings
+        self.hide()
+        self.tray_icon.show()
+        if self.is_closing:
             return
+        if system_tray_notice_shown:
+            return
+        else:
+            try:
+                self.tray_icon.showMessage(
+                    "Notice",
+                    "Pub-Xel will continue running in the background. This behavior can be changed in the Preferences menu.",
+                    QSystemTrayIcon.MessageIcon.Information,
+                    5000  # Duration in milliseconds
+                    )
+            except Exception as e:
+                print(f"Failed to show system tray notice: {e}")
+            system_tray_notice_shown += 1
+            settings = save_settings_key(settings,'system_tray_notice_shown',1)
 
-    if os_name == "Windows" and settings.get('close_to_system_tray', 0):
+    if settings.get('close_to_system_tray', 0):
         def closeEvent(self, event):
             event.ignore()
             self.minimize_to_tray()
-
-    elif os_name == "Windows" and not settings.get('close_to_system_tray', 0):
-        def closeEvent(self, event):
-            print("closeEvent")
-            QApplication.quit()
-            event.accept()
-
     else:
         def closeEvent(self, event):
             print("closeEvent")
@@ -1946,19 +1965,19 @@ if __name__ == '__main__':
 
     main_window = main_window()
 
-if settings.get('hotkey_open_value', 0) or settings.get('hotkey_inspect_value', 0):
-    worker = listenerWorker()
-    worker.open_inspect_signal.connect(main_window.open_inspect_window)
-    worker.open_file_signal.connect(main_window.main_openfile)
-    # Start the shortcut detection in the main thread
-    print("starting shortcut thread")
-    try:
-        check_shortcut(worker)
-        # shortcut_thread = threading.Thread(target=check_shortcut, args=(worker,))
-        # shortcut_thread.start()
-        print("shortcut_thread started successfully")
-    except Exception as e:
-        print(f"Error starting shortcut_thread: {e}")
+    if settings.get('hotkey_open_value', 0) or settings.get('hotkey_inspect_value', 0):
+        worker = listenerWorker()
+        worker.open_inspect_signal.connect(main_window.open_inspect_window)
+        worker.open_file_signal.connect(main_window.main_openfile)
+        # Start the shortcut detection in the main thread
+        print("starting shortcut thread")
+        try:
+            check_shortcut(worker)
+            # shortcut_thread = threading.Thread(target=check_shortcut, args=(worker,))
+            # shortcut_thread.start()
+            print("shortcut_thread started successfully")
+        except Exception as e:
+            print(f"Error starting shortcut_thread: {e}")
     
     print("close loading screen")
     close_loading_screen()
