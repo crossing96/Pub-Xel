@@ -3,7 +3,8 @@ name: Build and Release Pub-Xel
 on:
   release:
     types: [published]  # Trigger the workflow when a new release is published
-
+  workflow_dispatch:  # Allow manual triggering of the workflow
+  
 jobs:
   build-macos:
     runs-on: macos-latest  # Runs on GitHub's macOS virtual machine
@@ -40,6 +41,7 @@ jobs:
           create-dmg dist/Pub-Xel.app \
             --dmg-title="Pub-Xel Installer" \
             --overwrite \
+            --no-code-sign \
             --dmg-path="Pub-Xel_${VERSION}.dmg" \
             --icon-size=128 \
             --window-pos=200x200 \
