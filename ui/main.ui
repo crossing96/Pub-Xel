@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>550</width>
-    <height>391</height>
+    <height>416</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -452,7 +452,7 @@
      <x>0</x>
      <y>0</y>
      <width>550</width>
-     <height>22</height>
+     <height>24</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -460,6 +460,7 @@
      <string>File</string>
     </property>
     <addaction name="actionNew_Excel_Template"/>
+    <addaction name="separator"/>
     <addaction name="actionOpen_Library_Folder"/>
     <addaction name="actionOpen_Output_Folder"/>
     <addaction name="separator"/>
@@ -521,6 +522,11 @@
   <action name="actionNew_Excel_Template">
    <property name="text">
     <string>Save New Excel Worksheet</string>
+   </property>
+  </action>
+  <action name="actionRecent">
+   <property name="text">
+    <string>Recent</string>
    </property>
   </action>
  </widget>

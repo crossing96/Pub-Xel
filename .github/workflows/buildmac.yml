@@ -1,0 +1,55 @@
+name: Build and Release Pub-Xel
+
+on:
+  release:
+    types: [published]  # Trigger the workflow when a new release is published
+
+jobs:
+  build-macos:
+    runs-on: macos-latest  # Runs on GitHub's macOS virtual machine
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v3  # Clones your repository into the runner
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'  # Installs the latest Python 3
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          npm install -g create-dmg
+
+      - name: Build Mac App with PyInstaller
+        run: |
+          pyinstaller --onefile --noconsole --windowed --icon=assets/logo.icns \
+          --name="Pub-Xel" \
+          --add-data="data:data" \
+          --add-data="ui:ui" \
+          --add-data="assets:assets" \
+          --add-data="mainfunctions.py:." \
+          --add-data="welcome.py:." \
+          Pub-Xel.py
+
+      - name: Create DMG with Versioning
+        run: |
+          VERSION=$(git describe --tags --abbrev=0)  # Get the version from Git tags
+          create-dmg dist/Pub-Xel.app \
+            --dmg-title="Pub-Xel Installer" \
+            --overwrite \
+            --dmg-path="Pub-Xel_${VERSION}.dmg" \
+            --icon-size=128 \
+            --window-pos=200x200 \
+            --window-size=500x350 \
+            --icon="Pub-Xel.app"=100,150 \
+            --app-drop-link=350,150
+
+      - name: Upload DMG to Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: "Pub-Xel_*.dmg"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }} 

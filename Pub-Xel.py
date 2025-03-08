@@ -37,8 +37,11 @@ assets_dir = os.path.join(script_dir, 'assets')
 src_dir = os.path.join(script_dir, 'src')
 ui_dir = os.path.join(script_dir, 'ui')
 data_dir = os.path.join(script_dir, 'data')
-#version
-version = "1.0.0"
+
+# Read the version from the version.txt file
+version_file_path = os.path.join(data_dir, 'version.txt')
+with open(version_file_path, 'r') as version_file:
+    version = version_file.read().strip()
 
 #identify and make appdata directory
 if os_name == "Windows":
@@ -662,7 +665,7 @@ class window_about(QDialog):
         #question mark icons
         pixmap = QPixmap(loading_image_path)
         if pixmap.width() > 500:
-            pixmap = pixmap.scaled(500, 500, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            pixmap = pixmap.scaledToWidth(500, Qt.TransformationMode.SmoothTransformation)
         layout = self.findChild(QGridLayout, "gridLayout_image")
         self.label_q1 = QLabel("")
         self.label_q1.setPixmap(pixmap)
@@ -1371,7 +1374,6 @@ class SystemTrayIcon(QSystemTrayIcon):
             self.parent().showNormal()
         self.parent().show()
         self.parent().activateWindow()
-        self.hide()
 
     def on_exit(self):
         self.parent().close_application()
@@ -1486,6 +1488,9 @@ class main_window(QMainWindow):
         self.exitstatus = False
         self.is_closing = False
 
+        appdock = QApplication.instance() # for dock click event
+        appdock.applicationStateChanged.connect(self.on_application_state_changed) # for dock click event
+
         if developerMode:
             self.layout_developer = self.findChild(QHBoxLayout, "layout_developer")
             self.button1 = QPushButton('Button 1')
@@ -1568,7 +1573,7 @@ class main_window(QMainWindow):
 
 
         self.tray_icon = SystemTrayIcon(self)
-        self.tray_icon.hide()
+        self.tray_icon.show()
 
     def button3_clicked(self):
         def on_press(key):
@@ -1644,19 +1649,15 @@ class main_window(QMainWindow):
             print("WindowActivate event detected")
             self.update_excel_current()
             self.update_clipboard_current()
-        if os_name == "Darwin":
-            if event.type() == QEvent.Type.ApplicationActivate:
-                print("ApplicationActivate event detected")
-                self.on_application_activate()
         return super().event(event)
 
-    def on_application_activate(self):
-        if os_name == "Darwin":
-            print("Application activated from Dock")
+    def on_application_state_changed(self, state):
+        # Handle application state changes (e.g., dock/taskbar icon clicked)
+        if state == Qt.ApplicationState.ApplicationActive:
             self.show()
             self.activateWindow()
-        else:
-            return
+            print("Application activated from Dock")
+
 
     def open_about_window(self):
         global action_in_progress
@@ -1848,7 +1849,6 @@ class main_window(QMainWindow):
         global system_tray_notice_shown
         global settings
         self.hide()
-        self.tray_icon.show()
         if self.is_closing:
             return
         if system_tray_notice_shown:
