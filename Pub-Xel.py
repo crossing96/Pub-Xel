@@ -1488,8 +1488,9 @@ class main_window(QMainWindow):
         self.exitstatus = False
         self.is_closing = False
 
-        appdock = QApplication.instance() # for dock click event
-        appdock.applicationStateChanged.connect(self.on_application_state_changed) # for dock click event
+        if os_name == "Darwin":
+            appdock = QApplication.instance() # for dock click event
+            appdock.applicationStateChanged.connect(self.on_application_state_changed) # for dock click event
 
         if developerMode:
             self.layout_developer = self.findChild(QHBoxLayout, "layout_developer")
@@ -1651,13 +1652,14 @@ class main_window(QMainWindow):
             self.update_clipboard_current()
         return super().event(event)
 
-    def on_application_state_changed(self, state):
-        # Handle application state changes (e.g., dock/taskbar icon clicked)
-        if state == Qt.ApplicationState.ApplicationActive:
-            self.show()
-            self.activateWindow()
-            print("Application activated from Dock")
-
+    def on_application_state_changed(self, state):# Handle application state changes (e.g., dock/taskbar icon clicked)
+        if os_name == "Darwin":
+            if state == Qt.ApplicationState.ApplicationActive:
+                self.show()
+                self.activateWindow()
+                print("Application activated from Dock")
+        else:
+            return
 
     def open_about_window(self):
         global action_in_progress
