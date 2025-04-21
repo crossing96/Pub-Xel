@@ -1,5 +1,5 @@
 # Pub-Xel - A Biomedical Reference Management Tool
-# Copyright (C) 2024  Jongyeob Kim <jongyeobkim@pubxel.org>
+# Copyright (C) 2024  Jongyeob Kim <info@pubxel.org>
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -1084,6 +1084,8 @@ class window_inspect(QWidget):
         checked_main = [checkbox.text() for checkbox in self.checkboxes_main if checkbox.isChecked()]
         checked_suppl = [checkbox.text() for checkbox in self.checkboxes_suppl if checkbox.isChecked()]
         checked = checked_main + checked_suppl
+        if checked:
+            checked = [item.split(" : ")[0] for item in checked]
         result = self.export_files(checked)
         if result:
             self.close_inspect_window()     
@@ -1101,7 +1103,7 @@ class window_inspect(QWidget):
         
         def create_dated_folder(base_dir):
             today = datetime.datetime.today().strftime('%Y-%m-%d')
-            folder_name = "Pub-Xel exports "+today
+            folder_name = f"{today}"
             folder_path = os.path.join(base_dir, folder_name)
             counter = 2
 
