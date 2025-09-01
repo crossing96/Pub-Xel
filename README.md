@@ -15,7 +15,3 @@ This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**
 You are free to **use, modify, and distribute** the software under the terms of this license.
 
 See the [LICENSE](./LICENSE) file for more details.
-
-## Trademark Notice
-**Pub-Xel™ is a trademark of Jongyeob Kim**.  
-Unauthorized use of this name for derivative works, forks, or commercial products is strictly prohibited.
