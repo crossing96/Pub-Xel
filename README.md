@@ -3,7 +3,7 @@
 Pub-Xel™ is a reference management software designed to integrate seamlessly with **Microsoft Excel** and **PubMed**, enabling efficient literature organization.
 
 ## Installation
-1. Download the installer file from [pubxel.org](https://pubxel.org).
+1. Download the installer file from [pubxel.org](https://pubxel.org/download/).
 2. Run the installer to set up **Pub-Xel** on your system.
 
 ## Compatibility
