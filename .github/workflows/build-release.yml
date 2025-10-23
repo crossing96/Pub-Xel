@@ -103,8 +103,16 @@ jobs:
         shell: pwsh
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-          & "$iscc" "/DVersion=${{ steps.meta.outputs.version }}" "setup.iss"
-          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+          if (-not (Test-Path $iscc)) { throw "ISCC not found at $iscc" }
+
+          Set-Location $env:GITHUB_WORKSPACE
+          Write-Host "PWD:" (Get-Location).Path
+          Test-Path setup.iss | Write-Host "setup.iss exists? "
+          Test-Path LICENSE.txt | Write-Host "LICENSE.txt exists? "
+          if (Test-Path dist) { Get-ChildItem dist | ft -AutoSize } else { Write-Host "dist missing" }
+
+          & "$iscc" "/DVersion=${{ steps.meta.outputs.version }}" "/DROOT=$env:GITHUB_WORKSPACE" "$env:GITHUB_WORKSPACE\setup.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed ($LASTEXITCODE)" }
 
       - name: Show outputs
         shell: pwsh
