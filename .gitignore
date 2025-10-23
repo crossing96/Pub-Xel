@@ -6,8 +6,6 @@ dist/
 Output/
 software.txt
 *.spec
-setup.iss
-LICENSE.txt
 Pub-Xel.dmg
 Pub-Xel*.dmg
 .pytest_cache/
@@ -15,3 +13,5 @@ Pub-Xel*.dmg
 temp.py
 temp2.py
 temp3.py
+build_local.ps1
+combine_journal_data.py
