@@ -11,7 +11,7 @@ pip install --upgrade pip
 pip install PyQt6 xlwings pynput pyperclip requests beautifulsoup4 pyinstaller
 
 # Verify imports (fail fast)
-python - << 'PY'
+$verifyScript = @"
 import importlib, sys
 mods = [
   "PyQt6", "PyQt6.QtCore", "PyQt6.QtGui", "PyQt6.QtWidgets",
@@ -28,7 +28,11 @@ if failed:
     print("Missing modules:")
     for m,e in failed: print(" -", m, e)
     sys.exit(1)
-PY
+"@
+
+Set-Content -Path verify_imports.py -Value $verifyScript -Encoding UTF8
+python verify_imports.py
+Remove-Item verify_imports.py -Force
 
 # Build exe
 $opts = @(
