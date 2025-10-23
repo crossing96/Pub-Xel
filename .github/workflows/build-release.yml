@@ -94,6 +94,7 @@ jobs:
           Write-Host "Version is: ${{ steps.meta.outputs.version }}"
           Get-Content data/version.py
 
+          
       - name: Build exe with PyInstaller
         shell: pwsh
         run: |

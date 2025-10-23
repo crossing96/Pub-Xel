@@ -8,7 +8,27 @@ Remove-Item -Recurse -Force build, dist, Output -ErrorAction Ignore
 
 # Python deps
 pip install --upgrade pip
-pip install PyQt6 xlwings pyperclip pynput pyinstaller
+pip install PyQt6 xlwings pynput pyperclip requests beautifulsoup4 pyinstaller
+
+# Verify imports (fail fast)
+python - << 'PY'
+import importlib, sys
+mods = [
+  "PyQt6", "PyQt6.QtCore", "PyQt6.QtGui", "PyQt6.QtWidgets",
+  "xlwings", "pynput", "pyperclip", "requests", "bs4"
+]
+failed = []
+for m in mods:
+    try:
+        importlib.import_module(m)
+        print(f"OK: {m}")
+    except Exception as e:
+        failed.append((m, repr(e)))
+if failed:
+    print("Missing modules:")
+    for m,e in failed: print(" -", m, e)
+    sys.exit(1)
+PY
 
 # Build exe
 $opts = @(
@@ -32,7 +52,10 @@ $opts = @(
   "--hidden-import", "PyQt6.QtSvg",
   "--hidden-import", "PyQt6.QtNetwork",
   "--hidden-import", "xlwings",
-  "--hidden-import", "pyperclip"
+  "--hidden-import", "pyperclip",
+  "--hidden-import", "pynput",
+  "--hidden-import", "pynput.keyboard",
+  "--hidden-import", "pynput.keyboard._win32"
 )
 
 pyinstaller @opts --log-level=DEBUG
