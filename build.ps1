@@ -8,25 +8,35 @@ Remove-Item -Recurse -Force build, dist, Output -ErrorAction Ignore
 
 # Python deps
 pip install --upgrade pip
-if (Test-Path requirements.txt) { pip install -r requirements.txt }
-pip install pyinstaller
+pip install PyQt6 xlwings pyperclip pynput pyinstaller
 
 # Build exe
-pyinstaller --clean --onefile --noconsole --icon=assets/logo128.ico --version-file version_info.txt --specpath ./ Pub-Xel.py `
-  --add-data "data;data" `
-  --add-data "ui;ui" `
-  --add-data "assets;assets" `
-  --add-data "mainfunctions.py;." `
-  --add-data "welcome.py;." `
-  --collect-all PyQt6 `
-  --collect-all xlwings `
-  --hidden-import PyQt6.QtCore `
-  --hidden-import PyQt6.QtGui `
-  --hidden-import PyQt6.QtWidgets `
-  --hidden-import PyQt6.QtSvg `
-  --hidden-import PyQt6.QtNetwork `
-  --hidden-import xlwings `
-  --hidden-import pyperclip
+$opts = @(
+  "--clean",
+  "--onefile",
+  "--noconsole",
+  "--icon=assets/logo128.ico",
+  "--version-file", "version_info.txt",
+  "--specpath", ".",
+  "Pub-Xel.py",
+  "--add-data", "data;data",
+  "--add-data", "ui;ui",
+  "--add-data", "assets;assets",
+  "--add-data", "mainfunctions.py;.",
+  "--add-data", "welcome.py;.",
+  "--collect-all", "PyQt6",
+  "--collect-all", "xlwings",
+  "--hidden-import", "PyQt6.QtCore",
+  "--hidden-import", "PyQt6.QtGui",
+  "--hidden-import", "PyQt6.QtWidgets",
+  "--hidden-import", "PyQt6.QtSvg",
+  "--hidden-import", "PyQt6.QtNetwork",
+  "--hidden-import", "xlwings",
+  "--hidden-import", "pyperclip"
+)
+
+pyinstaller @opts --log-level=DEBUG
+
 
 # Sanity check
 if (-not (Test-Path "dist\Pub-Xel.exe")) {
