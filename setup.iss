@@ -1,5 +1,7 @@
 ; setup.iss
-#define Version "1.0.0"
+#ifndef Version
+  #define Version "1.0.0"
+#endif
 
 #ifndef ROOT
   #define ROOT "."
