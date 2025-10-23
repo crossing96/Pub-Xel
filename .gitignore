@@ -5,11 +5,13 @@ build/
 dist/
 Output/
 software.txt
-Pub-Xel.spec
+*.spec
 setup.iss
 LICENSE.txt
 Pub-Xel.dmg
 Pub-Xel*.dmg
+.pytest_cache/
+*.log
 temp.py
 temp2.py
 temp3.py

@@ -8,6 +8,7 @@
     "developerMode": 0,
     "hotkey_open_value" : "<Alt>+<Shift>+k",
     "hotkey_inspect_value" : "<Alt>+<Shift>+j",
+    "hotkey_pubmed_value" : "<Alt>+<Shift>+p",
     "launch_at_startup": 0,
     "close_to_system_tray": 1,
     "esc_to_system_tray": 1,

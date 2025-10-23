@@ -39,9 +39,7 @@ ui_dir = os.path.join(script_dir, 'ui')
 data_dir = os.path.join(script_dir, 'data')
 
 # Read the version from the version.txt file
-version_file_path = os.path.join(data_dir, 'version.txt')
-with open(version_file_path, 'r') as version_file:
-    version = version_file.read().strip()
+from data.version import __version__
 
 #identify and make appdata directory
 if os_name == "Windows":
@@ -211,6 +209,7 @@ else:
 if os_name == "Darwin":
     settings = save_settings_key(settings,"hotkey_inspect_value","")
     settings = save_settings_key(settings,"hotkey_open_value","")
+    settings = save_settings_key(settings,"hotkey_pubmed_value","")
 
 #other settings
 system_tray_notice_shown = settings.get('system_tray_notice_shown', 0)
@@ -385,6 +384,39 @@ class window_preferences(QDialog):
                     self.textboxes_inspect[i].setPlainText(hotkey_inspect_value[len(hotkey_string):])
                     break
 
+
+        #hotkey tab - pubmed
+        self.hotkeyvalue_pubmed = ""
+        self.layout_pubmed = self.findChild(QGridLayout, "layout_pubmed")
+        self.checkboxes_pubmed = []
+        self.textboxes_pubmed = []
+        self.groupBox_pubmed = self.findChild(QGroupBox, "groupBox_pubmed")
+        for i, hotkey_string in enumerate(self.hotkey_strings):
+            checkbox = QCheckBox(hotkey_string)
+            checkbox.setContentsMargins(6, 0, 6, 0)
+            checkbox.stateChanged.connect(lambda: self.update_hotkeyvalue_pubmed())
+            self.layout_pubmed.addWidget(checkbox, i, 0)
+            self.checkboxes_pubmed.append(checkbox)
+            textbox = QPlainTextEdit()
+            textbox.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            textbox.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            textbox.setContentsMargins(6, 0, 6, 0)
+            textbox.setFixedHeight(25)
+            textbox.setFixedWidth(50)
+            textbox.setEnabled(False)
+            textbox.textChanged.connect(lambda: self.update_hotkeyvalue_pubmed())
+            self.layout_pubmed.addWidget(textbox, i, 1)
+            self.textboxes_pubmed.append(textbox)
+        hotkey_pubmed_value = settings.get('hotkey_pubmed_value', 0)
+        if not hotkey_pubmed_value == "":
+            self.groupBox_pubmed.setChecked(True)
+            for i, hotkey_string in enumerate(self.hotkey_strings):
+                if hotkey_pubmed_value[:-1] == hotkey_string:
+                    self.checkboxes_pubmed[i].setChecked(True)
+                    self.textboxes_pubmed[i].setEnabled(True)
+                    self.textboxes_pubmed[i].setPlainText(hotkey_pubmed_value[len(hotkey_string):])
+                    break
+
         # hotkey tab - restore default
         self.button_hotdefault = self.findChild(QPushButton, 'button_hotdefault')
         self.button_hotdefault.clicked.connect(self.hotdefault)
@@ -508,6 +540,38 @@ class window_preferences(QDialog):
             self.textboxcurrent = False
             print(self.textboxcurrent)
 
+    def update_hotkeyvalue_pubmed(self):
+        sender = self.sender()
+        if isinstance(sender, QCheckBox) and not sender.testAttribute(Qt.WidgetAttribute.WA_UnderMouse):
+            return
+        if self.textboxcurrent:
+            return
+        sender = self.sender()
+        if isinstance(sender, QCheckBox):
+            for checkbox in self.checkboxes_pubmed:
+                if checkbox != sender:
+                    checkbox.setChecked(False)
+            index = self.checkboxes_pubmed.index(sender)
+            print(f"Checkbox index: {index}")
+            self.textboxes_pubmed[index].setEnabled(sender.isChecked())
+            for textbox in self.textboxes_pubmed:
+                if textbox != self.textboxes_pubmed[index]:
+                    textbox.setEnabled(False)
+        elif isinstance(sender, QPlainTextEdit):
+            self.textboxcurrent = True
+            print(self.textboxcurrent)
+            index = self.textboxes_pubmed.index(sender)
+            text = sender.toPlainText()
+            print(f"Textbox text: {text}")
+            if len(text) > 1:
+                sender.setPlainText(text[-1])
+            text = sender.toPlainText()
+            if not text.isalpha():
+                sender.setPlainText("")
+            sender.setPlainText(sender.toPlainText().lower())
+            self.textboxcurrent = False
+            print(self.textboxcurrent)
+
     def libdefault(self):
         self.plainTextEdit_mainlib.setPlainText(mainlibdirdefault)
         self.plainTextEdit_output.setPlainText(outdirdefault)
@@ -516,14 +580,20 @@ class window_preferences(QDialog):
     def hotdefault(self):
         self.groupBox_open.setChecked(True)
         self.groupBox_inspect.setChecked(True)
+        self.groupBox_pubmed.setChecked(True)
         for checkbox in self.checkboxes_open:
             checkbox.setChecked(False)
         for checkbox in self.checkboxes_inspect:
+            checkbox.setChecked(False)
+        for checkbox in self.checkboxes_pubmed:
             checkbox.setChecked(False)
         for textbox in self.textboxes_open:
             textbox.setPlainText("")
             textbox.setEnabled(False)
         for textbox in self.textboxes_inspect:
+            textbox.setPlainText("")
+            textbox.setEnabled(False)
+        for textbox in self.textboxes_pubmed:
             textbox.setPlainText("")
             textbox.setEnabled(False)
 
@@ -534,6 +604,9 @@ class window_preferences(QDialog):
         self.checkboxes_inspect[index].setChecked(True)
         self.textboxes_inspect[index].setEnabled(True)
         self.textboxes_inspect[index].setPlainText("j")
+        self.checkboxes_pubmed[index].setChecked(True)
+        self.textboxes_pubmed[index].setEnabled(True)
+        self.textboxes_pubmed[index].setPlainText("p")
 
     def saveexit(self):
         backup_settings = copy.deepcopy(self.settings)
@@ -586,6 +659,7 @@ class window_preferences(QDialog):
                     text = textbox.toPlainText()
                     if len(text) == 1 and text.isalpha():
                         self.hotkey_open = checkbox.text() + text.lower()
+
         self.hotkey_inspect = ""
         if not self.groupBox_inspect.isChecked():
             pass
@@ -595,16 +669,29 @@ class window_preferences(QDialog):
                     text = textbox.toPlainText()
                     if len(text) == 1 and text.isalpha():
                         self.hotkey_inspect = checkbox.text() + text.lower()
-        if not self.hotkey_open == "" and not self.hotkey_inspect == "":
-            if self.hotkey_open[-1] == self.hotkey_inspect[-1]:
+
+        self.hotkey_pubmed = ""
+        if not self.groupBox_pubmed.isChecked():
+            pass
+        else:
+            for checkbox, textbox in zip(self.checkboxes_pubmed, self.textboxes_pubmed):
+                if checkbox.isChecked():
+                    text = textbox.toPlainText()
+                    if len(text) == 1 and text.isalpha():
+                        self.hotkey_pubmed = checkbox.text() + text.lower()
+
+        if not self.hotkey_open == "" and not self.hotkey_inspect == "" and not self.hotkey_pubmed == "":
+            if (self.hotkey_open[-1] == self.hotkey_inspect[-1]) or (self.hotkey_open[-1] == self.hotkey_pubmed[-1]) or (self.hotkey_inspect[-1] == self.hotkey_pubmed[-1]):
                 self.settings = copy.deepcopy(backup_settings)
                 dialog_onebutton(self,"Error in Hotkeys Settings.\nThe alphabets for the two hotkeys cannot be the same.","Error")
                 return
 
         self.settings['hotkey_open_value'] = self.hotkey_open
         self.settings['hotkey_inspect_value'] = self.hotkey_inspect
+        self.settings['hotkey_pubmed_value'] = self.hotkey_pubmed
         save_settings(self.settings)
         print("Settings saved")
+        dialog_onebutton(self,"Settings saved! Please restart the software.","Settings saved")
         self.exit_main_window.emit()
         self.close()
 
@@ -656,9 +743,9 @@ class window_about(QDialog):
 
         self.setWindowTitle('About')
 
-        global version
+        global __version__
         link = "https://pubxel.org/"
-        self.findChild(QLabel, 'label_version').setText(f"Version: {version}")
+        self.findChild(QLabel, 'label_version').setText(f"Version: {__version__}")
         self.label_home = self.findChild(QLabel, 'label_home')
         self.label_home.setText(f'Home: <a href="{link}">{link}</a> ')
         self.label_home.setOpenExternalLinks(True)
@@ -1205,14 +1292,17 @@ class window_inspect(QWidget):
 
 
 class listenerWorker(QObject):
-    open_inspect_signal = pyqtSignal()
-    open_file_signal = pyqtSignal()
+    signal_inspect = pyqtSignal()
+    signal_open = pyqtSignal()
+    signal_pubmed = pyqtSignal()
     def __init__(self):
         super().__init__()
     def run_inspect(self):
-        self.open_inspect_signal.emit()
-    def run_file(self):
-        self.open_file_signal.emit()
+        self.signal_inspect.emit()
+    def run_open(self):
+        self.signal_open.emit()
+    def run_pubmed(self):
+        self.signal_pubmed.emit()
 
 listeners = []
 
@@ -1275,7 +1365,7 @@ class excelWorker(QThread):
                 print(f"Error accessing workbook or range: {e}")
             if wb is not None and rng is not None:
                 cellcount = rng.count
-                text = f"{cellcount} Cell{'s' if cellcount > 1 else ''} in {os.path.basename(wb.fullname)}."
+                text = f"{cellcount} Cell{'s' if cellcount > 1 else ''} in: {os.path.basename(wb.fullname)}."
             else: 
                 text = ""
             return text
@@ -1288,6 +1378,7 @@ def check_shortcut(worker):
 
     hotkey_inspect_value = settings.get("hotkey_inspect_value",0)
     hotkey_open_value = settings.get("hotkey_open_value",0)
+    hotkey_pubmed_value = settings.get("hotkey_pubmed_value",0)
 
     global action_in_progress, listeners
 
@@ -1303,17 +1394,28 @@ def check_shortcut(worker):
         global action_in_progress
         if not action_in_progress:
             print("on_activate_open activated")
-            worker.run_file()
+            worker.run_open()
         else:  
             print("on_activate_open but action in progress")
 
-    if hotkey_inspect_value == "" and hotkey_open_value == "":
+    def on_activate_pubmed():
+        global action_in_progress
+        if not action_in_progress:
+            print("on_activate_pubmed activated")
+            worker.run_pubmed()
+        else:  
+            print("on_activate_pubmed but action in progress")
+
+    if hotkey_inspect_value == "" and hotkey_open_value == "" and hotkey_pubmed_value == "":
         return
     if not hotkey_inspect_value == "":
         hotkey_j = keyboard.HotKey(keyboard.HotKey.parse(hotkey_inspect_value), on_activate_inspect)
     if not hotkey_open_value == "":
         hotkey_k = keyboard.HotKey(keyboard.HotKey.parse(hotkey_open_value), on_activate_open)
-    
+    if not hotkey_pubmed_value == "":
+        hotkey_p = keyboard.HotKey(keyboard.HotKey.parse(hotkey_pubmed_value), on_activate_pubmed)
+
+
     def for_canonical(f):
         return lambda k: f(listeners[0].canonical(k))
 
@@ -1322,6 +1424,8 @@ def check_shortcut(worker):
             hotkey_j.press(key)
         if not hotkey_open_value == "":
             hotkey_k.press(key)
+        if not hotkey_pubmed_value == "":
+            hotkey_p.press(key)
         return
 
     def on_release(key):
@@ -1329,6 +1433,8 @@ def check_shortcut(worker):
             hotkey_j.release(key)
         if not hotkey_open_value == "":
             hotkey_k.release(key)
+        if not hotkey_pubmed_value == "":
+            hotkey_p.release(key)
         return
 
     def start_listener():
@@ -1904,6 +2010,23 @@ class main_window(QMainWindow):
         print("action_in_progress False")
         self.setEnabled(True)  # Disable the main window
 
+    def main_openpubmed(self):
+        global action_in_progress
+        if action_in_progress:
+            return
+        print("opening pubmed link from main window...")
+        action_in_progress = True  # Set the action in progress
+        print("action_in_progress True")
+        self.setEnabled(False)  # Disable the main window
+        clipboardstring = pyperclip.paste()
+        idlist = string_to_list(clipboardstring)
+        output = process_ids(idlist,mainlibdir,seclibdir)
+        self.openpubmed_from_list(output[1]) #pubmed ids
+        action_in_progress = False
+        print("action_in_progress False")
+        self.setEnabled(True)  # Disable the main window
+
+
     def openfile_from_list(self, filelist):
         if filelist == []:
             dialog_onebutton(self,"No files to open.","Error")
@@ -1937,6 +2060,24 @@ class main_window(QMainWindow):
         if failed_files:
             dialog_onebutton(self,"The following files could not be opened:\n" + "\n".join(failed_files),"Error")
 
+
+
+    def openpubmed_from_list(self, filelist): #filelist: list of pubmed ids
+        if filelist == []: 
+            dialog_onebutton(self,"No PubMed articles to open.","Error")
+            return
+        
+        if len(filelist) > 500:
+            dialog_onebutton(self,"Cannot open more than 500 files.","Error")
+            return
+        
+        url = "https://pubmed.ncbi.nlm.nih.gov/?term=" + "%5Buid%5D+OR+".join(filelist) + "%5Buid%5D&sort=date"
+        webbrowser.open(url, new=2)
+
+    
+
+
+
     def open_inspect_window(self):
         global action_in_progress
         if action_in_progress:
@@ -1969,10 +2110,11 @@ if __name__ == '__main__':
 
     main_window = main_window()
 
-    if settings.get('hotkey_open_value', 0) or settings.get('hotkey_inspect_value', 0):
+    if settings.get('hotkey_open_value', 0) or settings.get('hotkey_inspect_value', 0) or settings.get('hotkey_pubmed_value', 0):
         worker = listenerWorker()
-        worker.open_inspect_signal.connect(main_window.open_inspect_window)
-        worker.open_file_signal.connect(main_window.main_openfile)
+        worker.signal_inspect.connect(main_window.open_inspect_window)
+        worker.signal_open.connect(main_window.main_openfile)
+        worker.signal_pubmed.connect(main_window.main_openpubmed)
         # Start the shortcut detection in the main thread
         print("starting shortcut thread")
         try:

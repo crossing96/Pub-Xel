@@ -315,6 +315,24 @@ Combinations of Ctrl, Alt, Shift, and alphabets (a~z) are allowed.
             </layout>
            </widget>
           </item>
+          <item>
+           <widget class="QGroupBox" name="groupBox_pubmed">
+            <property name="title">
+             <string>Open PubMed Page</string>
+            </property>
+            <property name="checkable">
+             <bool>true</bool>
+            </property>
+            <property name="checked">
+             <bool>false</bool>
+            </property>
+            <layout class="QGridLayout" name="layout_pubmed">
+             <property name="verticalSpacing">
+              <number>0</number>
+             </property>
+            </layout>
+           </widget>
+          </item>
          </layout>
         </widget>
        </item>

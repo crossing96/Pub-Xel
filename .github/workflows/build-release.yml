@@ -1,0 +1,134 @@
+name: Build and Release Windows Installer
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # get full history and tags
+
+      - name: Derive version from tag
+        id: meta
+        shell: pwsh
+        run: |
+          $ref = "${{ github.ref_name }}"
+          if ($ref -match '^v(\d+\.\d+\.\d+.*)$') {
+            $v = $Matches[1]
+          } else {
+            $v = "0.0.0-dev"
+          }
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\pip\Cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { throw "ISCC not found at $iscc" }
+
+      - name: Inject version into files (CI only)
+        id: inject
+        shell: pwsh
+        run: |
+          $v = "${{ steps.meta.outputs.version }}"
+          Write-Host "Injecting version: $v"
+
+          # 1) Overwrite Python version constant
+          $version_py_path = "data/version.py"
+          if (!(Test-Path (Split-Path $version_py_path))) {
+            New-Item -ItemType Directory -Path (Split-Path $version_py_path) -Force | Out-Null
+          }
+          Set-Content -Path $version_py_path -Value "__version__ = `"$v`"" -Encoding UTF8
+          Write-Host "Wrote $version_py_path"
+
+          # 2) Patch version_info.txt used by PyInstaller (optional but recommended)
+          # If you don't use version_info.txt, skip this block.
+          if (Test-Path version_info.txt) {
+            $vi = Get-Content version_info.txt -Raw
+
+            if ($v -match '^(\d+)\.(\d+)\.(\d+)') {
+              $major = $Matches[1]; $minor = $Matches[2]; $patch = $Matches[3]
+            } else {
+              $major = 0; $minor = 0; $patch = 0
+            }
+
+            $vi = $vi -replace 'filevers=\(\s*\d+,\s*\d+,\s*\d+,\s*\d+\s*\)', "filevers=($major, $minor, $patch, 0)"
+            $vi = $vi -replace 'prodvers=\(\s*\d+,\s*\d+,\s*\d+,\s*\d+\s*\)', "prodvers=($major, $minor, $patch, 0)"
+            $vi = $vi -replace "StringStruct\('FileVersion',\s*'[^']*'\)", "StringStruct('FileVersion', '$v')"
+            $vi = $vi -replace "StringStruct\('ProductVersion',\s*'[^']*'\)", "StringStruct('ProductVersion', '$v')"
+
+            Set-Content -Path version_info.txt -Value $vi -Encoding UTF8
+            Write-Host "Patched version_info.txt"
+          } else {
+            Write-Host "version_info.txt not found; skipping patch"
+          }
+            
+      - name: Verify injected version
+        shell: pwsh
+        run: |
+          Write-Host "Version is: ${{ steps.meta.outputs.version }}"
+          Get-Content data/version.py
+
+      - name: Build exe with PyInstaller
+        shell: pwsh
+        run: |
+          ./build.ps1
+
+      - name: Build installer with Inno Setup
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & "$iscc" "/DVersion=${{ steps.meta.outputs.version }}" "setup.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed" }
+
+      - name: Show outputs
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse dist, Output | Format-Table -AutoSize
+
+      - name: Upload artifacts (CI proof)
+        uses: actions/upload-artifact@v4
+        with:
+          name: pubxel-${{ steps.meta.outputs.version }}
+          path: |
+            dist/Pub-Xel.exe
+            Output/Pub-Xel_Installer_v${{ steps.meta.outputs.version }}.exe
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Pub-Xel ${{ steps.meta.outputs.version }}
+          draft: false
+          # Draft vs prerelease: tags like v1.1.0-rc1 will mark the Release as prerelease.
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
+          files: |
+            dist/Pub-Xel.exe
+            Output/Pub-Xel_Installer_v${{ steps.meta.outputs.version }}.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -186,8 +186,9 @@ def process_ids(ids, maindir, seclibdir=[]):
             if seclibdir:
                 for directory in seclibdir:
                     filelist.extend(os.listdir(directory))
+            escaped_id = re.escape(id)  # escape regex specials
             for filename in filelist:
-                if filename.startswith(id) and re.match(rf"^{id}\.[^.]+$", filename):
+                if filename.startswith(id) and re.match(rf"^{escaped_id}\.[^.]+$", filename):
                     m_files.append(filename)
             if m_files:
                 valid_ids_with_m_files.append(id)
@@ -532,7 +533,8 @@ def input_pubmed_data():
     "firstauthor":"fa","author":"au","year":"yr","authoryear":"fayr",
     "journal":"jo","title":"ti","abstract":"ab","citation":"cite","output2":"ou2","authors":"au2",
     "if2022":"if2022","citation2022":"cite2022",
-    "if2023":"if2023","citation2023":"cite2023"}
+    "if2023":"if2023","citation2023":"cite2023",
+    "if2024":"if2024","citation2024":"cite2024"}
 
     header2 = {}
     try:
@@ -610,34 +612,50 @@ def input_pubmed_data():
     script_dir = os.path.dirname(os.path.abspath(__file__))
     data_dir = os.path.join(script_dir, 'data')
 
-    impactfactor2022 = {}
-    impactfactor2023 = {}
+    impactfactordict = {}
 
-    #IF2022
-    importIF2022 = header2.get("if2022",-1)>=0 or header2.get("cite2022",-1)>=0
-    if importIF2022:
-        IF2022_path = os.path.join(data_dir, 'impactfactor2022.txt')
-        print("load IF2022")
-        with open(IF2022_path, "r", encoding="utf8") as file:
-            lines = file.readlines()
-            for line in lines[1:]:  # Skip the header line
-                parts = line.strip().split('\t')
-                if len(parts) == 3:
-                    journal, IF2022, quartile2022 = parts
-                    impactfactor2022[journal] = (IF2022, quartile2022)
+    need_2022 = header2.get("if2022", -1) >= 0 or header2.get("cite2022", -1) >= 0
+    need_2023 = header2.get("if2023", -1) >= 0 or header2.get("cite2023", -1) >= 0
+    need_2024 = header2.get("if2024", -1) >= 0 or header2.get("cite2024", -1) >= 0
+    need_any  = need_2022 or need_2023 or need_2024
 
-    #IF2023
-    importIF2023 = header2.get("if2023",-1)>=0 or header2.get("cite2023",-1)>=0
-    if importIF2023:
-        IF2023_path = os.path.join(data_dir, 'impactfactor2023.txt')
-        print("load IF2023")
-        with open(IF2023_path, "r", encoding="utf8") as file:
+    if need_any:
+        IF_COMBINED_PATH = os.path.join(data_dir, "journal_combined_2.txt")
+        print("load impactfactor from combined dataset")
+        with open(IF_COMBINED_PATH, "r", encoding="utf8") as file:
             lines = file.readlines()
-            for line in lines[1:]:  # Skip the header line
-                parts = line.strip().split('\t')
-                if len(parts) == 3:
-                    journal, IF2023, quartile2023 = parts
-                    impactfactor2023[journal] = (IF2023, quartile2023)
+            if not lines:
+                pass  # no data
+            else:
+                header = [h.strip() for h in lines[0].rstrip("\n").split("\t")]
+                hidx = {name: i for i, name in enumerate(header)}
+                for line in lines[1:]:  # Skip the header line
+                    parts = line.rstrip("\n").split("\t")
+                    # ensure required columns exist
+                    if "abb" not in hidx or ("IF_2022" not in hidx and "q_2022" not in hidx and "IF_2023" not in hidx and "q_2023" not in hidx and "IF_2024" not in hidx and "q_2024" not in hidx):
+                        continue
+                    # ensure row long enough to access indexes we need
+                    max_idx = max(
+                        hidx.get("abb", -1),
+                        hidx.get("IF_2022", -1), hidx.get("q_2022", -1),
+                        hidx.get("IF_2023", -1), hidx.get("q_2023", -1),
+                        hidx.get("IF_2024", -1), hidx.get("q_2024", -1),
+                    )
+                    if len(parts) <= max_idx:
+                        continue
+                    abb = parts[hidx["abb"]].strip()
+                    if not abb:
+                        continue
+                    IF2022 = parts[hidx["IF_2022"]].strip() if "IF_2022" in hidx else ""
+                    quartile2022 = parts[hidx["q_2022"]].strip() if "q_2022" in hidx else ""
+                    IF2023 = parts[hidx["IF_2023"]].strip() if "IF_2023" in hidx else ""
+                    quartile2023 = parts[hidx["q_2023"]].strip() if "q_2023" in hidx else ""
+                    IF2024 = parts[hidx["IF_2024"]].strip() if "IF_2024" in hidx else ""
+                    quartile2024 = parts[hidx["q_2024"]].strip() if "q_2024" in hidx else ""
+                    if IF2022 or quartile2022 or IF2023 or quartile2023 or IF2024 or quartile2024:
+                        impactfactordict[abb] = (IF2022, quartile2022,IF2023,quartile2023,IF2024,quartile2024)
+
+
 
     PMID_list = []
     identifiedPMID_list=[]
@@ -696,28 +714,35 @@ def input_pubmed_data():
         firstauthorlastnameetal = value_from_dict(PMID_dict,"firstauthorlastnameetal","string","")
         cite = firstauthorlastnameetal.rstrip(".")+ ". "+ title + " " + source
 
-        if importIF2022:
-            try:
-                IF2022 = impactfactor2022.get(journal.upper())[0]
-            except Exception:
-                IF2022=""
-            if header2.get("cite2022",-1)>=0:
-                # source: Create a pattern with a capturing group, and then use re.sub with the pattern and replacement
-                pattern = re.escape(journal)
-                replacement = r"\1 (IF: " + IF2022 + ")"
-                source2022 = re.sub(f"({pattern})", replacement, source, count=1)
-                cite2022 = firstauthorlastnameetal.rstrip(".")+ ". "+ title + " " + source2022
+        if need_any:
+            IF2022,Q2022,IF2023,Q2023,IF2024,Q2024= impactfactordict.get(journal.upper(),("", "", "", "", "", ""))
 
-        if importIF2023:
-            try:
-                IF2023 = impactfactor2023.get(journal.upper())[0]
-            except Exception:
-                IF2023=""
-            if header2.get("cite2023",-1)>=0:
-                pattern = re.escape(journal)
-                replacement = r"\1 (IF: " + IF2023 + ")"
-                source2023 = re.sub(f"({pattern})", replacement, source, count=1)
-                cite2023 = firstauthorlastnameetal.rstrip(".")+ ". "+ title + " " + source2023
+            if header2.get("cite2022", -1) >= 0:
+                if IF2022:
+                    pattern = re.escape(journal)
+                    replacement = r"\1 (IF: " + IF2022 + ")"
+                    source2022 = re.sub(f"({pattern})", replacement, source, count=1)
+                else:
+                    source2022 = source
+                cite2022 = firstauthorlastnameetal.rstrip(".") + ". " + title + " " + source2022
+
+            if header2.get("cite2023", -1) >= 0:
+                if IF2023:
+                    pattern = re.escape(journal)
+                    replacement = r"\1 (IF: " + IF2023 + ")"
+                    source2023 = re.sub(f"({pattern})", replacement, source, count=1)
+                else:
+                    source2023 = source
+                cite2023 = firstauthorlastnameetal.rstrip(".") + ". " + title + " " + source2023
+
+            if header2.get("cite2024", -1) >= 0:
+                if IF2024:
+                    pattern = re.escape(journal)
+                    replacement = r"\1 (IF: " + IF2024 + ")"
+                    source2024 = re.sub(f"({pattern})", replacement, source, count=1)
+                else:
+                    source2024 = source
+                cite2024 = firstauthorlastnameetal.rstrip(".") + ". " + title + " " + source2024
 
         
         if header2.get("doi",-1)>=0:
@@ -748,6 +773,11 @@ def input_pubmed_data():
             ws[i,header2.get("if2023")].value = NAifempty(IF2023)
         if header2.get("cite2023",-1)>=0:
             ws[i,header2.get("cite2023")].value = NAifempty(cite2023)
+        if header2.get("if2024",-1)>=0:
+            ws[i,header2.get("if2024")].value = NAifempty(IF2024)
+        if header2.get("cite2024",-1)>=0:
+            ws[i,header2.get("cite2024")].value = NAifempty(cite2024)
+
 
     # # Enable screen updating
     # app.api.ScreenUpdating = True
