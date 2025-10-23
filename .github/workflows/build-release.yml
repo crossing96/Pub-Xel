@@ -107,8 +107,8 @@ jobs:
 
           Set-Location $env:GITHUB_WORKSPACE
           Write-Host "PWD:" (Get-Location).Path
-          Test-Path setup.iss | Write-Host "setup.iss exists? "
-          Test-Path LICENSE.txt | Write-Host "LICENSE.txt exists? "
+          Write-Host "setup.iss exists? " (Test-Path setup.iss)
+          Write-Host "LICENSE.txt exists? " (Test-Path LICENSE.txt)
           if (Test-Path dist) { Get-ChildItem dist | ft -AutoSize } else { Write-Host "dist missing" }
 
           & "$iscc" "/DVersion=${{ steps.meta.outputs.version }}" "/DROOT=$env:GITHUB_WORKSPACE" "$env:GITHUB_WORKSPACE\setup.iss"
