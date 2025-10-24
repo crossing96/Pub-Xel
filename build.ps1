@@ -49,21 +49,10 @@ $opts = @(
   "--add-data", "mainfunctions.py;.",
   "--add-data", "welcome.py;.",
   "--collect-all", "PyQt6",
-  "--collect-all", "xlwings",
-  "--hidden-import", "PyQt6.QtCore",
-  "--hidden-import", "PyQt6.QtGui",
-  "--hidden-import", "PyQt6.QtWidgets",
-  "--hidden-import", "PyQt6.QtSvg",
-  "--hidden-import", "PyQt6.QtNetwork",
-  "--hidden-import", "xlwings",
-  "--hidden-import", "pyperclip",
-  "--hidden-import", "pynput",
-  "--hidden-import", "pynput.keyboard",
-  "--hidden-import", "pynput.keyboard._win32"
+  "--collect-all", "xlwings"
 )
 
 pyinstaller @opts --log-level=DEBUG
-
 
 # Sanity check
 if (-not (Test-Path "dist\Pub-Xel.exe")) {
