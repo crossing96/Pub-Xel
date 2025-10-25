@@ -26,21 +26,35 @@ SolidCompression=yes
 LicenseFile={#ROOT}\LICENSE.txt
 UsePreviousTasks=no
 AppModifyPath={app}\Pub-Xel.exe
+UsePreviousAppDir=yes
 
 [Code]
 var
   IsUpdateInstall: Boolean;
 
-function InitializeSetup(): Boolean;
+function GetPrevInstallDir: string;
+var
+  Prev: string;
 begin
-  IsUpdateInstall := DirExists(ExpandConstant('{app}'));
+  if RegQueryStringValue(HKCU, 'Software\Pub-Xel', 'InstallPath', Prev) and DirExists(Prev) then
+    Result := Prev
+  else
+    Result := '';
+end;
+
+procedure InitializeWizard;
+var
+  Prev: string;
+begin
+  Prev := GetPrevInstallDir;
+  IsUpdateInstall := Prev <> '';
+
   if IsUpdateInstall then
   begin
     WizardForm.Caption := 'Pub-Xel Update';
-    WizardForm.DirEdit.Text := ExpandConstant('{app}');
+    WizardForm.DirEdit.Text := Prev;
     WizardForm.DirBrowseButton.Visible := False;
   end;
-  Result := True;
 end;
 
 function ShouldTaskBeChecked(const TaskName: String): Boolean;
