@@ -208,14 +208,16 @@ def process_ids(ids, maindir, seclibdir=[]):
     # 12 nonpubmed_ids_with_m_files, 13 nonpubmed_ids_without_m_files
     return valid_ids, pubmed_ids, non_pubmed_valid_ids, invalid_ids, valid_ids_with_m_files, valid_ids_without_m_files, pubmed_ids_with_m_files, pubmed_ids_without_m_files, pubmed_ids_with_s_files, pubmed_ids_without_s_files, all_m_files, all_s_files,nonpubmed_ids_with_m_files,nonpubmed_ids_without_m_files
 
-def copy_list(lst):
-    # Check if the list is empty
-    if not lst:
-        return None  # Don't do anything
-    # Concatenate the list with a line break as a delimiter
-    result = '\n'.join(lst)
-    # Copy the string to the clipboard
+
+def copy_list(lst): #copy list or string. 
+    if not lst: # Check if the list is empty
+        return None 
+    if isinstance(lst, str):
+        result = lst
+    else:
+        result = '\n'.join(lst)
     pyperclip.copy(result)
+
 
 def trim_range(rng,reselect=True):
     wb = xw.books.active
@@ -532,9 +534,9 @@ def input_pubmed_data():
     header = {"ref":"pmid","doi":"doi",
     "firstauthor":"fa","author":"au","year":"yr","authoryear":"fayr",
     "journal":"jo","title":"ti","abstract":"ab","citation":"cite","output2":"ou2","authors":"au2",
-    "if2022":"if2022","citation2022":"cite2022",
-    "if2023":"if2023","citation2023":"cite2023",
-    "if2024":"if2024","citation2024":"cite2024"}
+    "if2022":"if2022","citation2022":"cite2022","q2022":"q2022",
+    "if2023":"if2023","citation2023":"cite2023","q2023":"q2023",
+    "if2024":"if2024","citation2024":"cite2024","q2024":"q2024"}
 
     header2 = {}
     try:
@@ -614,9 +616,9 @@ def input_pubmed_data():
 
     impactfactordict = {}
 
-    need_2022 = header2.get("if2022", -1) >= 0 or header2.get("cite2022", -1) >= 0
-    need_2023 = header2.get("if2023", -1) >= 0 or header2.get("cite2023", -1) >= 0
-    need_2024 = header2.get("if2024", -1) >= 0 or header2.get("cite2024", -1) >= 0
+    need_2022 = header2.get("if2022", -1) >= 0 or header2.get("cite2022", -1) >= 0 or header2.get("q2022", -1) >= 0
+    need_2023 = header2.get("if2023", -1) >= 0 or header2.get("cite2023", -1) >= 0 or header2.get("q2023", -1) >= 0
+    need_2024 = header2.get("if2024", -1) >= 0 or header2.get("cite2024", -1) >= 0 or header2.get("q2024", -1) >= 0
     need_any  = need_2022 or need_2023 or need_2024
 
     if need_any:
@@ -627,8 +629,8 @@ def input_pubmed_data():
             if not lines:
                 pass  # no data
             else:
-                header = [h.strip() for h in lines[0].rstrip("\n").split("\t")]
-                hidx = {name: i for i, name in enumerate(header)}
+                tsv_header = [h.strip() for h in lines[0].rstrip("\n").split("\t")]
+                hidx = {name: i for i, name in enumerate(tsv_header)}
                 for line in lines[1:]:  # Skip the header line
                     parts = line.rstrip("\n").split("\t")
                     # ensure required columns exist
@@ -715,7 +717,8 @@ def input_pubmed_data():
         cite = firstauthorlastnameetal.rstrip(".")+ ". "+ title + " " + source
 
         if need_any:
-            IF2022,Q2022,IF2023,Q2023,IF2024,Q2024= impactfactordict.get(journal.upper(),("", "", "", "", "", ""))
+            jkey = (journal or "").upper().strip().rstrip(".")
+            IF2022,Q2022,IF2023,Q2023,IF2024,Q2024= impactfactordict.get(jkey,("", "", "", "", "", ""))
 
             if header2.get("cite2022", -1) >= 0:
                 if IF2022:
@@ -769,15 +772,20 @@ def input_pubmed_data():
             ws[i,header2.get("if2022")].value = NAifempty(IF2022)
         if header2.get("cite2022",-1)>=0:
             ws[i,header2.get("cite2022")].value = NAifempty(cite2022)
+        if header2.get("q2022",-1)>=0:
+            ws[i,header2.get("q2022")].value = NAifempty(Q2022)
         if header2.get("if2023",-1)>=0:
             ws[i,header2.get("if2023")].value = NAifempty(IF2023)
         if header2.get("cite2023",-1)>=0:
             ws[i,header2.get("cite2023")].value = NAifempty(cite2023)
+        if header2.get("q2023",-1)>=0:
+            ws[i,header2.get("q2023")].value = NAifempty(Q2023)
         if header2.get("if2024",-1)>=0:
             ws[i,header2.get("if2024")].value = NAifempty(IF2024)
         if header2.get("cite2024",-1)>=0:
             ws[i,header2.get("cite2024")].value = NAifempty(cite2024)
-
+        if header2.get("q2024",-1)>=0:
+            ws[i,header2.get("q2024")].value = NAifempty(Q2024)
 
     # # Enable screen updating
     # app.api.ScreenUpdating = True

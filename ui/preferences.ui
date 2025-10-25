@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>580</width>
+    <width>610</width>
     <height>508</height>
    </rect>
   </property>
@@ -250,7 +250,7 @@ Please list directories separated by line breaks (Enter key).</string>
          <property name="text">
           <string>Global Hotkeys in Pub-Xel
 
-Global Hotkeys allows opening files while Pub-Xel is running in the background. By default, Pub-Xel uses Alt+Shift+k and Alt+Shift+j, which are chosen to minimize hotkey conflicts with other software.
+Global Hotkeys allows opening files while Pub-Xel is running in the background. By default, Pub-Xel uses Alt+Shift+k, Alt+Shift+j, and Alt+Shift+p, which are chosen to minimize hotkey conflicts with other software.
 
 You can enable and customize your hotkeys here. 
 Combinations of Ctrl, Alt, Shift, and alphabets (a~z) are allowed.

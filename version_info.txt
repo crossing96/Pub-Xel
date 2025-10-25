@@ -24,7 +24,7 @@ VSVersionInfo(
           StringStruct('OriginalFilename', 'Pub-Xel.exe'),
           StringStruct('ProductName', 'Pub-Xel'),
           StringStruct('ProductVersion', '1.0.0'),
-          StringStruct('LegalCopyright', '© 2025 Pub-Xel Team')
+          StringStruct('LegalCopyright', '© 2024 Pub-Xel Team')
         ]
       )
     ]),

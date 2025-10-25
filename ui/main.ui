@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>550</width>
-    <height>416</height>
+    <width>605</width>
+    <height>431</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -451,8 +451,8 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>550</width>
-     <height>24</height>
+     <width>605</width>
+     <height>22</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -478,6 +478,8 @@
      <string>About</string>
     </property>
     <addaction name="actionAbout"/>
+    <addaction name="separator"/>
+    <addaction name="actionWorksheetColumns"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
@@ -527,6 +529,11 @@
   <action name="actionRecent">
    <property name="text">
     <string>Recent</string>
+   </property>
+  </action>
+  <action name="actionWorksheetColumns">
+   <property name="text">
+    <string>View Worksheet Columns</string>
    </property>
   </action>
  </widget>

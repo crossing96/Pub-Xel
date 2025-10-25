@@ -126,6 +126,7 @@ from PyQt6 import uic
 main_path = os.path.join(ui_dir, 'main.ui')
 inspect_path = os.path.join(ui_dir, 'inspect.ui')
 about_path = os.path.join(ui_dir, 'about.ui')
+worksheetColumns_path = os.path.join(ui_dir, 'worksheetColumns.ui')
 preferences_path = os.path.join(ui_dir, 'preferences.ui')
 icon_path = os.path.join(assets_dir, 'logo64.ico')
 questionmark_icon_path = os.path.join(assets_dir, 'questionmark.png')
@@ -217,6 +218,7 @@ developerMode = settings.get('developerMode',0)
 
 # Flag to indicate whether an action is in progress
 action_in_progress = False
+worksheetColumns_in_progress = False
 
 # _get_sep, dirname: functions to get the path separator and directory component, for both windows and mac
 def _get_sep(p):
@@ -766,6 +768,94 @@ class window_about(QDialog):
         self.show()
 
     def close_about_window(self):
+        self.close()
+
+
+
+class window_worksheetColumns(QDialog):
+    def __init__(self, parent):
+        super().__init__()
+        uic.loadUi(worksheetColumns_path, self)
+        # global action_in_progress
+        # action_in_progress = True
+        # print("action_in_progress True")
+        # self.hide()
+        # parent.setEnabled(False)  # Disable the main window
+        self.pseudo_parent = parent
+
+        self.setWindowTitle('View Worksheet Columns')
+
+        fields = [
+            "IF2024",
+            "Q2024",
+            "abstract",
+            "authoryear",
+            "citation",
+            "citation2024",
+            "doi",
+            "journal",
+            "ref",
+            "title",
+            "year"
+        ]
+
+        for name in fields:
+            button = self.findChild(QPushButton, f'button_{name}')
+            label = self.findChild(QLabel, f'label_{name}')
+            if button and label:
+                button.clicked.connect(lambda _, l=label: copy_list(l.text()))
+
+        # button_IF2024 = self.findChild(QPushButton, 'button_IF2024')
+        # label_IF2024 = self.findChild(QLabel, "label_IF2024")
+        # button_IF2024.clicked.connect(lambda: copy_list(label_IF2024.text()))
+
+        # button_Q2024 = self.findChild(QPushButton, 'button_Q2024')
+        # label_Q2024 = self.findChild(QLabel, "label_Q2024")
+        # button_Q2024.clicked.connect(lambda: copy_list(label_Q2024.text()))
+
+        # button_abstract = self.findChild(QPushButton, 'button_abstract')
+        # label_abstract = self.findChild(QLabel, "label_abstract")
+        # button_abstract.clicked.connect(lambda: copy_list(label_abstract.text()))
+
+        # button_authoryear = self.findChild(QPushButton, 'button_authoryear')
+        # label_authoryear = self.findChild(QLabel, "label_authoryear")
+        # button_authoryear.clicked.connect(lambda: copy_list(label_authoryear.text()))
+
+        # button_citation = self.findChild(QPushButton, 'button_citation')
+        # label_citation = self.findChild(QLabel, "label_citation")
+        # button_citation.clicked.connect(lambda: copy_list(label_citation.text()))
+
+        # button_citation2024 = self.findChild(QPushButton, 'button_citation2024')
+        # label_citation2024 = self.findChild(QLabel, "label_citation2024")
+        # button_citation2024.clicked.connect(lambda: copy_list(label_citation2024.text()))
+
+        # button_doi = self.findChild(QPushButton, 'button_doi')
+        # label_doi = self.findChild(QLabel, "label_doi")
+        # button_doi.clicked.connect(lambda: copy_list(label_doi.text()))
+
+        # button_journal = self.findChild(QPushButton, 'button_journal')
+        # label_journal = self.findChild(QLabel, "label_journal")
+        # button_journal.clicked.connect(lambda: copy_list(label_journal.text()))
+
+        # button_ref = self.findChild(QPushButton, 'button_ref')
+        # label_ref = self.findChild(QLabel, "label_ref")
+        # button_ref.clicked.connect(lambda: copy_list(label_ref.text()))
+
+        # button_title = self.findChild(QPushButton, 'button_title')
+        # label_title = self.findChild(QLabel, "label_title")
+        # button_title.clicked.connect(lambda: copy_list(label_title.text()))
+
+        # button_year = self.findChild(QPushButton, 'button_year')
+        # label_year = self.findChild(QLabel, "label_year")
+        # button_year.clicked.connect(lambda: copy_list(label_year.text()))
+
+        button_ok = self.findChild(QPushButton, 'button_ok')
+        button_ok.clicked.connect(self.close_worksheetColumns_window)
+        shortcut_Esc = QShortcut(QKeySequence('Esc'), self)
+        shortcut_Esc.activated.connect(self.close_worksheetColumns_window)
+        self.show()
+
+    def close_worksheetColumns_window(self):
         self.close()
 
 class window_inspect(QWidget):
@@ -1676,6 +1766,7 @@ class main_window(QMainWindow):
         self.findChild(QAction, 'actionNew_Excel_Template').triggered.connect(self.save_pubsheet)
         self.findChild(QAction, 'actionPreferences').triggered.connect(self.open_preferences)
         self.findChild(QAction, 'actionAbout').triggered.connect(self.open_about_window)
+        self.findChild(QAction, 'actionWorksheetColumns').triggered.connect(self.open_worksheetColumns_window)
 
         self.setStyleSheet("""QGroupBox#groupBoxExcel {font-size: 14px;}
                            QGroupBox#groupBoxClipboard {font-size: 14px;}""")
@@ -1781,6 +1872,19 @@ class main_window(QMainWindow):
         action_in_progress = False
         print("action_in_progress False")
         self.setEnabled(True)  # Re-enable the main window
+
+    def open_worksheetColumns_window(self):
+        global worksheetColumns_in_progress
+        if worksheetColumns_in_progress:
+            return
+        worksheetColumns_in_progress=True
+        print("worksheetColumns_in_progress True")
+        # self.setEnabled(False)  # Disable the main window
+        dialog = window_worksheetColumns(self)
+        dialog.exec()  # This will block until the dialog is closed
+        worksheetColumns_in_progress = False
+        print("worksheetColumns_in_progress False")
+        # self.setEnabled(True)  # Re-enable the main window
 
     def open_preferences(self):
         global action_in_progress
@@ -2106,6 +2210,109 @@ class main_window(QMainWindow):
         inspect_window = None
         inspect_window = window_inspect(self,data_to_pass)
 
+##################Check for updates#####################
+CHECKFILE = os.path.join(appdatadir, "pubxel_check.json")
+
+def should_check_for_update() -> bool:
+    """Return True if last check was ≥ 7 days ago or never."""
+    if not os.path.exists(CHECKFILE):
+        print("CHECKFILE does not exist; should_check_for_update = TRUE")
+        return True
+    try:
+        with open(CHECKFILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        last_check = datetime.datetime.fromisoformat(data.get("last_check", "1970-01-01"))
+        print("current time: ", datetime.datetime.now().isoformat())
+        print(f"Last update check was on {last_check.isoformat()}")
+        print("Days since last check: ", (datetime.datetime.now() - last_check).days)
+        print("should_check_for_update = ", (datetime.datetime.now() - last_check).days >= 7)
+        return (datetime.datetime.now() - last_check).days >= 7
+    except Exception:
+        print("CHECKFILE open error; should_check_for_update = TRUE")
+        return True
+
+def save_check_timestamp() -> None:
+    """Save current time to skip rechecking for 1 week."""
+    try:
+        with open(CHECKFILE, "w", encoding="utf-8") as f:
+            json.dump({"last_check": datetime.datetime.now().isoformat()}, f)
+    except Exception:
+        pass
+
+def parse_version(v: str):
+    """Convert '1.2.3' → (1,2,3) for easy comparison."""
+    try:
+        parts = [int(x) for x in v.split(".")]
+        while len(parts) < 3:
+            parts.append(0)
+        return tuple(parts[:3])
+    except Exception:
+        return (0, 0, 0)
+
+def dialog_update(parent, message, title="Update Available"):
+    """
+    Show a two-button modal dialog:
+      - Yes → returns True
+      - One week later → returns False
+    """
+    msg_box = QMessageBox(parent)
+    msg_box.setWindowTitle(title)
+    msg_box.setText(message)
+    msg_box.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+    msg_box.button(QMessageBox.StandardButton.Yes).setText("Update now")
+    msg_box.button(QMessageBox.StandardButton.No).setText("Remind me in a week")
+    msg_box.setWindowModality(Qt.WindowModality.ApplicationModal)
+    msg_box.exec()
+    msg_box.setFocus(QtCore.Qt.FocusReason.PopupFocusReason)
+    return msg_box.clickedButton() == msg_box.button(QMessageBox.StandardButton.Yes)
+
+def check_for_update(parent=None):
+    """
+    1. Skip if checked within a week.
+    2. Fetch latest.json from GitHub.
+    3. Recommend update only if minor version changed.
+    4. Ask user to update now or be reminded in a week.
+    """
+    if not should_check_for_update():
+        return
+
+    try:
+        resp = requests.get(
+            "https://raw.githubusercontent.com/crossing96/Pub-Xel/main/data/latest.json",
+            timeout=3,
+        )
+        if not resp.ok:
+            print("Update check failed (bad response).")
+            return
+        info = resp.json()
+        latest = info.get("version", "")
+        dl_url = info.get("download_url", "")
+        from data.version import __version__ as current
+
+        c_major, c_minor, c_patch = parse_version(current)
+        l_major, l_minor, l_patch = parse_version(latest)
+
+        print("new version: ", latest)
+        print("current version: ", current)
+
+        # Recommend update only if same major but newer minor version
+        if (l_major > c_major) or (l_major == c_major and l_minor > c_minor):
+            message = f"A new version ({latest}) is available.\nYou're running {current}."
+            if dialog_update(parent, message):
+                if dl_url:
+                    webbrowser.open(dl_url)
+            # Save timestamp regardless of choice (don't nag until next week)
+            save_check_timestamp()
+        else:
+            save_check_timestamp()
+    except Exception:
+        print("Update check failed.")
+        # Never let update check break startup
+        pass
+
+
+##################Main Application Entry Point#####################
+
 if __name__ == '__main__':
 
     main_window = main_window()
@@ -2128,6 +2335,9 @@ if __name__ == '__main__':
     print("close loading screen")
     close_loading_screen()
     print("main_window show")
+
+    check_for_update()
+    
     main_window.show()
 
 
