@@ -2282,7 +2282,7 @@ def dialog_update(parent, message, title="Update Available"):
 
 def check_for_update(parent=None):
     """
-    1. Skip if checked within a week.
+    1. Skip if checked within a week...
     2. Fetch latest.json from GitHub.
     3. Recommend update only if minor version changed.
     4. Ask user to update now or be reminded in a week.
