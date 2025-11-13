@@ -52,6 +52,18 @@
        <verstretch>0</verstretch>
       </sizepolicy>
      </property>
+     <property name="font">
+      <font>
+       <weight>50</weight>
+       <bold>false</bold>
+      </font>
+     </property>
+     <property name="lineWidth">
+      <number>1</number>
+     </property>
+     <property name="midLineWidth">
+      <number>0</number>
+     </property>
      <property name="horizontalScrollBarPolicy">
       <enum>Qt::ScrollBarAlwaysOff</enum>
      </property>
@@ -62,7 +74,7 @@
       <property name="geometry">
        <rect>
         <x>0</x>
-        <y>0</y>
+        <y>-18</y>
         <width>665</width>
         <height>476</height>
        </rect>
@@ -166,6 +178,12 @@
        </item>
        <item row="0" column="2">
         <widget class="QLabel" name="label_11">
+         <property name="font">
+          <font>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
          <property name="text">
           <string>Definition</string>
          </property>
@@ -207,6 +225,12 @@
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
+         </property>
+         <property name="font">
+          <font>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
          </property>
          <property name="text">
           <string>Column</string>
@@ -363,6 +387,12 @@
        </item>
        <item row="0" column="3">
         <widget class="QLabel" name="label_12">
+         <property name="font">
+          <font>
+           <weight>75</weight>
+           <bold>true</bold>
+          </font>
+         </property>
          <property name="text">
           <string>Example</string>
          </property>
@@ -593,7 +623,7 @@
           </sizepolicy>
          </property>
          <property name="text">
-          <string>Polack et al. Safety and Efficacy of the BNT162b2 mRNA Covid-19 Vaccine. N Engl J Med. 2020 Dec 31;383(27):2603-2615.</string>
+          <string>Polack et al. Safety and Efficacy of the BNT162b2 mRNA Covid-19 Vaccine. N Engl J Med. 2020 Dec 31;383(27):2603-2615. PMID: 33301246.</string>
          </property>
          <property name="wordWrap">
           <bool>true</bool>
@@ -722,7 +752,7 @@
           </sizepolicy>
          </property>
          <property name="text">
-          <string>Polack et al. Safety and Efficacy of the BNT162b2 mRNA Covid-19 Vaccine. N Engl J Med (IF: 78.5). 2020 Dec 31;383(27):2603-2615.</string>
+          <string>Polack et al. Safety and Efficacy of the BNT162b2 mRNA Covid-19 Vaccine. N Engl J Med (IF: 78.5). 2020 Dec 31;383(27):2603-2615. PMID: 33301246.</string>
          </property>
          <property name="wordWrap">
           <bool>true</bool>

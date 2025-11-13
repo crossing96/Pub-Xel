@@ -419,18 +419,20 @@ def obtain_pubmed_data(PMID_list):
                     result[key] = value
         return result
         
-    def get_first_doi_value(input):
-        if isinstance(input, str):
-            if input.endswith(" [doi]"):
-                return input[:-6]  # Remove " [doi]" from the end
-            return ""  # Return "NA" if the string does not end with " [doi]"
-        elif isinstance(input, list):
-            for value in input:
-                if value.endswith(" [doi]"):
-                    return value[:-6]  # Remove " [doi]" from the end
-            return ""  # Return "" if no such value is found in the list
-        else:
-            return ""  # Return "" if input is neither a string nor a list
+    def get_first_doi_value(values):
+        """
+        Returns the first DOI string (without ' [doi]') from a list.
+        If no valid DOI is found or input is invalid, returns an empty string.
+        """
+        try:
+            if not isinstance(values, list):
+                return ""
+            for v in values:
+                if isinstance(v, str) and v.endswith(" [doi]"):
+                    return v[:-6]  # strip " [doi]"
+            return ""
+        except Exception:
+            return ""
         
     def NAifempty(value):
         if value == "" or value is None:
@@ -518,7 +520,7 @@ def obtain_pubmed_data(PMID_list):
             "authoryear" : authoryear,
             "date": value_from_dict(PMID_dict, "DP"),
             "year": year,
-            "doi": get_first_doi_value(value_from_dict(PMID_dict, "AID")),
+            "doi": get_first_doi_value(value_from_dict(PMID_dict, "AID",outputtype="list")),
             "source" : source,
             "cite": cite,
             "cite_maincheckbox": cite_maincheckbox,
@@ -714,7 +716,7 @@ def input_pubmed_data():
         title = value_from_dict(PMID_dict,"title","string","")
         source = value_from_dict(PMID_dict,"source","string","")
         firstauthorlastnameetal = value_from_dict(PMID_dict,"firstauthorlastnameetal","string","")
-        cite = firstauthorlastnameetal.rstrip(".")+ ". "+ title + " " + source
+        cite = firstauthorlastnameetal.rstrip(".")+ ". "+ title + " " + source.rstrip()+" PMID: "+PMIDstring+"."
 
         if need_any:
             jkey = (journal or "").upper().strip().rstrip(".")
@@ -727,7 +729,7 @@ def input_pubmed_data():
                     source2022 = re.sub(f"({pattern})", replacement, source, count=1)
                 else:
                     source2022 = source
-                cite2022 = firstauthorlastnameetal.rstrip(".") + ". " + title + " " + source2022
+                cite2022 = firstauthorlastnameetal.rstrip(".") + ". " + title + " " + source2022.rstrip()+" PMID: "+PMIDstring+"."
 
             if header2.get("cite2023", -1) >= 0:
                 if IF2023:
@@ -736,7 +738,7 @@ def input_pubmed_data():
                     source2023 = re.sub(f"({pattern})", replacement, source, count=1)
                 else:
                     source2023 = source
-                cite2023 = firstauthorlastnameetal.rstrip(".") + ". " + title + " " + source2023
+                cite2023 = firstauthorlastnameetal.rstrip(".") + ". " + title + " " + source2023.rstrip()+" PMID: "+PMIDstring+"."
 
             if header2.get("cite2024", -1) >= 0:
                 if IF2024:
@@ -745,7 +747,7 @@ def input_pubmed_data():
                     source2024 = re.sub(f"({pattern})", replacement, source, count=1)
                 else:
                     source2024 = source
-                cite2024 = firstauthorlastnameetal.rstrip(".") + ". " + title + " " + source2024
+                cite2024 = firstauthorlastnameetal.rstrip(".") + ". " + title + " " + source2024.rstrip()+" PMID: "+PMIDstring+"."
 
         
         if header2.get("doi",-1)>=0:

@@ -1,10 +1,6 @@
-# build.ps1
-
-# Running this locally in PowerShell: 
 $comment = @'
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\build.ps1
-& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" ".\setup.iss"
+.\build_temp.ps1
 
 '@
 
@@ -12,7 +8,7 @@ Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 $ErrorActionPreference = "Stop"
 
 # Clean old outputs
-# basically redundant but harmless. On a self-hosted runner, 
+# basically redundant but harmless. On a self-hosted runner,
 # it’s essential to avoid stale junk contaminating builds. Keep it.
 Remove-Item -Recurse -Force build, dist, Output -ErrorAction Ignore
 
@@ -44,10 +40,9 @@ Set-Content -Path verify_imports.py -Value $verifyScript -Encoding UTF8
 python verify_imports.py
 Remove-Item verify_imports.py -Force
 
-# Build exe
+# Build exe (onedir)
 $opts = @(
-  "--clean",
-  "--onefile",
+  "--onedir",
   "--noconsole",
   "--icon=assets/logo128.ico",
   "--version-file", "version_info.txt",
@@ -58,13 +53,31 @@ $opts = @(
   "--add-data", "assets;assets",
   "--add-data", "mainfunctions.py;.",
   "--add-data", "welcome.py;.",
-  "--collect-all", "PyQt6",
-  "--collect-all", "xlwings"
+
+  # Exclude unused modules
+  "--exclude-module", "PyQt6.QtWebEngineCore",
+  "--exclude-module", "PyQt6.QtWebEngineWidgets",
+  "--exclude-module", "PyQt6.QtWebChannel",
+  "--exclude-module", "PyQt6.QtQuick",
+  "--exclude-module", "PyQt6.QtQml",
+  "--exclude-module", "PyQt6.QtMultimedia",
+  "--exclude-module", "PyQt6.QtNetwork",
+  "--exclude-module", "PyQt6.QtPrintSupport",
+  "--exclude-module", "PyQt6.QtSql",
+  "--exclude-module", "PyQt6.QtBluetooth",
+  "--exclude-module", "PyQt6.QtNfc",
+  "--exclude-module", "PyQt6.QtSensors",
+  "--exclude-module", "PyQt6.QtPositioning",
+  "--exclude-module", "PyQt6.QtOpenGL",
+  "--exclude-module", "PyQt6.QtSvg"
 )
 
 pyinstaller @opts --log-level=DEBUG
 
 # Sanity check
-if (-not (Test-Path "dist\Pub-Xel.exe")) {
-  Write-Error "PyInstaller output missing"
+$targetDir = "dist\Pub-Xel"
+if (-not (Test-Path $targetDir)) {
+  Write-Error "PyInstaller output folder missing: $targetDir"
+} else {
+  Write-Host "Build OK. Check $targetDir"
 }

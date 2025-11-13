@@ -18,7 +18,7 @@ VSVersionInfo(
         '040904B0',
         [
           StringStruct('CompanyName', 'Pub-Xel Project'),
-          StringStruct('FileDescription', 'Pub-Xel Software'),
+          StringStruct('FileDescription', 'Pub-Xel'),
           StringStruct('FileVersion', '1.0.0'),
           StringStruct('InternalName', 'Pub-Xel'),
           StringStruct('OriginalFilename', 'Pub-Xel.exe'),

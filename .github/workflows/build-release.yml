@@ -137,7 +137,7 @@ jobs:
         with:
           name: pubxel-${{ steps.meta.outputs.version }}
           path: |
-            dist/Pub-Xel.exe
+            dist/Pub-Xel/**
             Output/Pub-Xel_Installer_v${{ steps.meta.outputs.version }}.exe
 
       - name: Rename installer for latest link

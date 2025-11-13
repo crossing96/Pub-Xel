@@ -61,6 +61,7 @@ if os_name == "Windows":
             QMessageBox.critical(None, "Error", "Pub-Xel is already running.")
             sys.exit(0)
     create_lock_file()
+
 elif os_name == "Darwin":
     import fcntl
     lock_file_path = os.path.join(appdatadir, 'my_script.lock')
@@ -76,7 +77,7 @@ elif os_name == "Darwin":
 else :
     raise Exception("Unsupported operating system")
 
-
+splash = None
 # Function to create and display the loading screen
 def show_loading_screen():
     global splash
@@ -115,6 +116,10 @@ import shutil
 import copy
 import xlwings as xw
 import concurrent.futures
+import json
+import re
+import requests
+import atexit
 
 from PyQt6.QtWidgets import QScrollArea,QGroupBox,QPlainTextEdit,QFileDialog, QDialog, QFrame, QSystemTrayIcon,QSizePolicy,QGridLayout,QSpacerItem,QPushButton,QLabel,QCheckBox, QWidget, QMainWindow,QHBoxLayout, QVBoxLayout, QMenu
 from PyQt6.QtGui import QFontMetrics,QTextDocument,QKeySequence,QShortcut,QAction, QIcon, QTextCursor
@@ -219,6 +224,28 @@ developerMode = settings.get('developerMode',0)
 # Flag to indicate whether an action is in progress
 action_in_progress = False
 worksheetColumns_in_progress = False
+force_quit = False
+
+def graceful_shutdown():
+    # stop listeners, workers, release file locks, etc.
+    try:
+        stop_listeners()
+    except Exception:
+        pass
+    try:
+        # release and remove lock file
+        global lock_file, lock_file_path
+        try:
+            lock_file.close()
+        except Exception:
+            pass
+        try:
+            os.remove(lock_file_path)
+        except Exception:
+            pass
+    except Exception:
+        pass
+atexit.register(graceful_shutdown)
 
 # _get_sep, dirname: functions to get the path separator and directory component, for both windows and mac
 def _get_sep(p):
@@ -774,28 +801,22 @@ class window_about(QDialog):
 
 class window_worksheetColumns(QDialog):
     def __init__(self, parent):
-        super().__init__()
+        super().__init__(parent)
         uic.loadUi(worksheetColumns_path, self)
-        # global action_in_progress
-        # action_in_progress = True
-        # print("action_in_progress True")
-        # self.hide()
-        # parent.setEnabled(False)  # Disable the main window
         self.pseudo_parent = parent
-
         self.setWindowTitle('View Worksheet Columns')
 
         fields = [
-            "IF2024",
-            "Q2024",
-            "abstract",
-            "authoryear",
+            "IF2024", 
+            "Q2024", 
+            "abstract", 
+            "authoryear", 
             "citation",
-            "citation2024",
-            "doi",
-            "journal",
-            "ref",
-            "title",
+            "citation2024", 
+            "doi", 
+            "journal", 
+            "ref", 
+            "title", 
             "year"
         ]
 
@@ -805,54 +826,15 @@ class window_worksheetColumns(QDialog):
             if button and label:
                 button.clicked.connect(lambda _, l=label: copy_list(l.text()))
 
-        # button_IF2024 = self.findChild(QPushButton, 'button_IF2024')
-        # label_IF2024 = self.findChild(QLabel, "label_IF2024")
-        # button_IF2024.clicked.connect(lambda: copy_list(label_IF2024.text()))
-
-        # button_Q2024 = self.findChild(QPushButton, 'button_Q2024')
-        # label_Q2024 = self.findChild(QLabel, "label_Q2024")
-        # button_Q2024.clicked.connect(lambda: copy_list(label_Q2024.text()))
-
-        # button_abstract = self.findChild(QPushButton, 'button_abstract')
-        # label_abstract = self.findChild(QLabel, "label_abstract")
-        # button_abstract.clicked.connect(lambda: copy_list(label_abstract.text()))
-
-        # button_authoryear = self.findChild(QPushButton, 'button_authoryear')
-        # label_authoryear = self.findChild(QLabel, "label_authoryear")
-        # button_authoryear.clicked.connect(lambda: copy_list(label_authoryear.text()))
-
-        # button_citation = self.findChild(QPushButton, 'button_citation')
-        # label_citation = self.findChild(QLabel, "label_citation")
-        # button_citation.clicked.connect(lambda: copy_list(label_citation.text()))
-
-        # button_citation2024 = self.findChild(QPushButton, 'button_citation2024')
-        # label_citation2024 = self.findChild(QLabel, "label_citation2024")
-        # button_citation2024.clicked.connect(lambda: copy_list(label_citation2024.text()))
-
-        # button_doi = self.findChild(QPushButton, 'button_doi')
-        # label_doi = self.findChild(QLabel, "label_doi")
-        # button_doi.clicked.connect(lambda: copy_list(label_doi.text()))
-
-        # button_journal = self.findChild(QPushButton, 'button_journal')
-        # label_journal = self.findChild(QLabel, "label_journal")
-        # button_journal.clicked.connect(lambda: copy_list(label_journal.text()))
-
-        # button_ref = self.findChild(QPushButton, 'button_ref')
-        # label_ref = self.findChild(QLabel, "label_ref")
-        # button_ref.clicked.connect(lambda: copy_list(label_ref.text()))
-
-        # button_title = self.findChild(QPushButton, 'button_title')
-        # label_title = self.findChild(QLabel, "label_title")
-        # button_title.clicked.connect(lambda: copy_list(label_title.text()))
-
-        # button_year = self.findChild(QPushButton, 'button_year')
-        # label_year = self.findChild(QLabel, "label_year")
-        # button_year.clicked.connect(lambda: copy_list(label_year.text()))
-
         button_ok = self.findChild(QPushButton, 'button_ok')
         button_ok.clicked.connect(self.close_worksheetColumns_window)
+
         shortcut_Esc = QShortcut(QKeySequence('Esc'), self)
         shortcut_Esc.activated.connect(self.close_worksheetColumns_window)
+
+        # Auto-close when main window is destroyed
+        QApplication.instance().aboutToQuit.connect(self.close)
+
         self.show()
 
     def close_worksheetColumns_window(self):
@@ -2080,19 +2062,51 @@ class main_window(QMainWindow):
             system_tray_notice_shown += 1
             settings = save_settings_key(settings,'system_tray_notice_shown',1)
 
-    if settings.get('close_to_system_tray', 0):
-        def closeEvent(self, event):
+
+
+    # if settings.get('close_to_system_tray', 0):
+    #     def closeEvent(self, event):
+    #         event.ignore()
+    #         self.minimize_to_tray()
+    # else:
+    #     def closeEvent(self, event):
+    #         print("closeEvent")
+    #         QApplication.quit()
+    #         event.accept()
+
+    def closeEvent(self, event):
+        # If Qt or the installer is closing us (not the user clicking X), accept and quit.
+        # event.spontaneous() is True for user-driven events.
+        # We accept when:
+        #   - force_quit is True (we called close_application / QApplication.quit)
+        #   - not event.spontaneous() (programmatic close like WM_CLOSE from installer/OS)
+        if force_quit or not event.spontaneous():
+            # QApplication.quit()
+            event.accept()
+            return
+
+        # Otherwise apply "close to tray" behavior only for user-initiated closes
+        if settings.get('close_to_system_tray', 0):
             event.ignore()
             self.minimize_to_tray()
-    else:
-        def closeEvent(self, event):
-            print("closeEvent")
-            QApplication.quit()
+        else:
+            # QApplication.quit()
             event.accept()
 
+
+    # def close_application(self):
+    #     self.is_closing = True
+    #     print("close_application")
+    #     QApplication.quit()
+
     def close_application(self):
+        global force_quit
         self.is_closing = True
-        print("close_application")
+        force_quit = True
+        try:
+            graceful_shutdown()
+        except Exception:
+            pass
         QApplication.quit()
                                           
     def sayHello(self,event=None):
@@ -2296,7 +2310,7 @@ def check_for_update(parent=None):
         print("current version: ", current)
 
         # Recommend update only if same major but newer minor version
-        if (l_major > c_major) or (l_major == c_major and l_minor > c_minor):
+        if (l_major > c_major) or (l_major == c_major and l_minor > c_minor) or (l_major == c_major and l_minor == c_minor and l_patch > c_patch):
             message = f"A new version ({latest}) is available.\nYou're running {current}."
             if dialog_update(parent, message):
                 if dl_url:
