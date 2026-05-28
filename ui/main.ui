@@ -464,6 +464,7 @@
     <addaction name="actionOpen_Library_Folder"/>
     <addaction name="actionOpen_Output_Folder"/>
     <addaction name="separator"/>
+    <addaction name="separator"/>
     <addaction name="actionMinimize"/>
     <addaction name="actionExit"/>
    </widget>

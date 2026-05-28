@@ -10,9 +10,7 @@ Pub-Xel.dmg
 Pub-Xel*.dmg
 .pytest_cache/
 *.log
-temp.py
-temp2.py
-temp3.py
-build_local.ps1
-combine_journal_data.py
 data/latest.json
+sandbox/
+temp.py
+metadata_store.sqlite

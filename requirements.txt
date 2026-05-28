@@ -1,0 +1,6 @@
+PyQt6
+xlwings
+pynput
+requests
+beautifulsoup4
+pyinstaller

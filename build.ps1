@@ -14,14 +14,14 @@ Remove-Item -Recurse -Force build, dist, Output -ErrorAction Ignore
 
 # Python deps
 pip install --upgrade pip
-pip install PyQt6 xlwings pynput pyperclip requests beautifulsoup4 pyinstaller
+pip install PyQt6 xlwings pynput requests beautifulsoup4 pyinstaller
 
 # Verify imports (fail fast)
 $verifyScript = @"
 import importlib, sys
 mods = [
   "PyQt6", "PyQt6.QtCore", "PyQt6.QtGui", "PyQt6.QtWidgets",
-  "xlwings", "pynput", "pyperclip", "requests", "bs4"
+  "xlwings", "pynput", "requests", "bs4"
 ]
 failed = []
 for m in mods:
@@ -40,6 +40,9 @@ Set-Content -Path verify_imports.py -Value $verifyScript -Encoding UTF8
 python verify_imports.py
 Remove-Item verify_imports.py -Force
 
+python scripts/smoke_imports.py
+if ($LASTEXITCODE -ne 0) { throw "smoke_imports.py failed" }
+
 # Build exe (onedir)
 $opts = @(
   "--onedir",
@@ -51,8 +54,7 @@ $opts = @(
   "--add-data", "data;data",
   "--add-data", "ui;ui",
   "--add-data", "assets;assets",
-  "--add-data", "mainfunctions.py;.",
-  "--add-data", "welcome.py;.",
+  "--add-data", "pubxel_core;pubxel_core",
 
   # Exclude unused modules
   "--exclude-module", "PyQt6.QtWebEngineCore",

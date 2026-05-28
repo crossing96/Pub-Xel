@@ -15,7 +15,7 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout" stretch="0,0,1,0">
    <item>
-    <layout class="QGridLayout" name="gridLayout_title" columnstretch="0,0">
+    <layout class="QGridLayout" name="gridLayout_title" columnstretch="0,0,0">
      <item row="0" column="0">
       <widget class="QLabel" name="label_title">
        <property name="sizePolicy">
@@ -93,6 +93,28 @@
          </property>
         </layout>
        </widget>
+      </widget>
+     </item>
+     <item row="0" column="2">
+      <widget class="QLabel" name="label_pubmed_connection_status">
+       <property name="minimumSize">
+        <size>
+         <width>20</width>
+         <height>20</height>
+        </size>
+       </property>
+       <property name="maximumSize">
+        <size>
+         <width>20</width>
+         <height>20</height>
+        </size>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+       <property name="alignment">
+        <set>Qt::AlignCenter</set>
+       </property>
       </widget>
      </item>
     </layout>

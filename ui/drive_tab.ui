@@ -1,0 +1,271 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>DriveTabPreview</class>
+ <widget class="QDialog" name="DriveTabPreview">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>610</width>
+    <height>560</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>Drive (preview)</string>
+  </property>
+  <!--
+    To paste this into preferences.ui as a tab:
+      1. Take the contents of <layout class="QVBoxLayout" name="verticalLayout_drive"> below.
+      2. In preferences.ui, add a new tab inside <tabWidget>:
+           <widget class="QWidget" name="tab_drive">
+             <attribute name="title"><string>Drive</string></attribute>
+             ...paste the layout here...
+           </widget>
+      3. Done — every widget already has a stable objectName for Python wiring.
+  -->
+  <layout class="QVBoxLayout" name="verticalLayout_drive">
+
+   <!-- ===== Top row: question-mark help icon, right-aligned ===== -->
+   <item>
+    <layout class="QHBoxLayout" name="layout_drive_header">
+     <item>
+      <spacer name="horizontalSpacer_drive_header">
+       <property name="orientation"><enum>Qt::Horizontal</enum></property>
+       <property name="sizeHint" stdset="0">
+        <size><width>40</width><height>20</height></size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <!-- Populated at runtime with the questionmark.png pixmap, mirroring layout_q1/layout_q2 in main.ui -->
+      <layout class="QGridLayout" name="layout_q_drive">
+       <property name="leftMargin"><number>0</number></property>
+       <property name="topMargin"><number>0</number></property>
+       <property name="rightMargin"><number>0</number></property>
+       <property name="bottomMargin"><number>0</number></property>
+      </layout>
+     </item>
+    </layout>
+   </item>
+
+   <!-- ===== Group 1: Connection ===== -->
+   <item>
+    <widget class="QGroupBox" name="groupBox_drive_connection">
+     <property name="title">
+      <string>Google Drive Connection</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_drive_connection">
+
+      <item>
+       <layout class="QHBoxLayout" name="layout_drive_status_row">
+        <item>
+         <widget class="QLabel" name="label_drive_status_caption">
+          <property name="text"><string>Status:</string></property>
+          <property name="minimumSize"><size><width>60</width><height>0</height></size></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="label_drive_status">
+          <property name="text"><string>Not connected</string></property>
+          <property name="styleSheet"><string>QLabel { color: #888; }</string></property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer_drive_status">
+          <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          <property name="sizeHint" stdset="0">
+           <size><width>40</width><height>20</height></size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
+
+      <item>
+       <layout class="QHBoxLayout" name="layout_drive_account_row">
+        <item>
+         <widget class="QLabel" name="label_drive_account_caption">
+          <property name="text"><string>Account:</string></property>
+          <property name="minimumSize"><size><width>60</width><height>0</height></size></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="label_drive_account">
+          <property name="text"><string>—</string></property>
+          <property name="textInteractionFlags">
+           <set>Qt::TextSelectableByMouse</set>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer_drive_account">
+          <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          <property name="sizeHint" stdset="0">
+           <size><width>40</width><height>20</height></size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
+
+      <item>
+       <layout class="QHBoxLayout" name="layout_drive_connect_row">
+        <item>
+         <spacer name="horizontalSpacer_drive_connect">
+          <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          <property name="sizeHint" stdset="0">
+           <size><width>40</width><height>20</height></size>
+          </property>
+         </spacer>
+        </item>
+        <item>
+         <widget class="QPushButton" name="button_drive_connect">
+          <property name="text"><string>Connect Google Drive…</string></property>
+          <property name="minimumSize"><size><width>180</width><height>0</height></size></property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+
+     </layout>
+    </widget>
+   </item>
+
+   <!-- ===== Group 2: Designated Folders ===== -->
+   <item>
+    <widget class="QGroupBox" name="groupBox_drive_folders">
+     <property name="title">
+      <string>Designated Folders</string>
+     </property>
+     <property name="enabled"><bool>false</bool></property>
+     <layout class="QVBoxLayout" name="verticalLayout_drive_folders">
+
+      <item>
+       <widget class="QLabel" name="label_drive_folders_help">
+        <property name="text">
+         <string>Drive folders Pub-Xel will search by filename. Add by pasting a Drive folder URL or ID.</string>
+        </property>
+        <property name="wordWrap"><bool>true</bool></property>
+       </widget>
+      </item>
+
+      <item>
+       <widget class="QListWidget" name="list_drive_folders">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="maximumSize">
+         <size><width>16777215</width><height>150</height></size>
+        </property>
+        <property name="alternatingRowColors"><bool>true</bool></property>
+       </widget>
+      </item>
+
+      <item>
+       <layout class="QHBoxLayout" name="layout_drive_folder_buttons">
+        <item>
+         <widget class="QPushButton" name="button_drive_folder_add">
+          <property name="text"><string>Add Folder…</string></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="button_drive_folder_remove">
+          <property name="text"><string>Remove</string></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="button_drive_folder_open">
+          <property name="text"><string>Open in Drive</string></property>
+         </widget>
+        </item>
+        <item>
+         <spacer name="horizontalSpacer_drive_folder_buttons">
+          <property name="orientation"><enum>Qt::Horizontal</enum></property>
+          <property name="sizeHint" stdset="0">
+           <size><width>40</width><height>20</height></size>
+          </property>
+         </spacer>
+        </item>
+       </layout>
+      </item>
+
+      <item>
+       <widget class="QCheckBox" name="checkbox_drive_recursive">
+        <property name="text"><string>Include subfolders when searching</string></property>
+       </widget>
+      </item>
+
+     </layout>
+    </widget>
+   </item>
+
+   <!-- ===== Group 3: Downloads ===== -->
+   <item>
+    <widget class="QGroupBox" name="groupBox_drive_download">
+     <property name="title">
+      <string>Downloads</string>
+     </property>
+     <property name="enabled"><bool>false</bool></property>
+     <layout class="QVBoxLayout" name="verticalLayout_drive_download">
+
+      <item>
+       <layout class="QHBoxLayout" name="layout_drive_download_caption_row" stretch="10,1,1">
+        <item>
+         <widget class="QLabel" name="label_drive_download_dir">
+          <property name="text">
+           <string>Folder for files downloaded from Google Drive.</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="button_drive_download_dir_select">
+          <property name="text"><string>Select Folder</string></property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QPushButton" name="button_drive_download_dir_default">
+          <property name="text"><string>Use Default</string></property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+
+      <item>
+       <widget class="QPlainTextEdit" name="plainTextEdit_drive_download_dir">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="maximumSize">
+         <size><width>16777215</width><height>40</height></size>
+        </property>
+        <property name="readOnly"><bool>true</bool></property>
+        <property name="placeholderText">
+         <string>(default: &lt;appdata&gt;/pubxel/drive_cache)</string>
+        </property>
+       </widget>
+      </item>
+
+     </layout>
+    </widget>
+   </item>
+
+   <item>
+    <spacer name="verticalSpacer_drive">
+     <property name="orientation"><enum>Qt::Vertical</enum></property>
+     <property name="sizeHint" stdset="0">
+      <size><width>20</width><height>40</height></size>
+     </property>
+    </spacer>
+   </item>
+
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

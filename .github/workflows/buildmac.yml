@@ -31,8 +31,7 @@ jobs:
           --add-data="data:data" \
           --add-data="ui:ui" \
           --add-data="assets:assets" \
-          --add-data="mainfunctions.py:." \
-          --add-data="welcome.py:." \
+          --add-data="pubxel_core:pubxel_core" \
           Pub-Xel.py
 
       - name: Create DMG with Versioning
