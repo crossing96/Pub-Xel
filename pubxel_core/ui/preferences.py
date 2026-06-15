@@ -5,9 +5,10 @@ import copy
 import logging
 import os
 from PyQt6 import QtCore, uic
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QTextCursor
 from PyQt6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QDialog,
     QFileDialog,
@@ -16,10 +17,12 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPlainTextEdit,
     QPushButton,
+    QTabBar,
     QWidget,
 )
 
 from pubxel_core import runtime as rt
+from pubxel_core.clipboard import write_clipboard
 from pubxel_core.settings import save_settings
 from pubxel_core.ui.helpers import dialog_onebutton
 
@@ -41,11 +44,16 @@ class window_preferences(QDialog):
             index_to_hide = self.tabWidget.indexOf(self.tab_hot)
             self.tabWidget.removeTab(index_to_hide)
 
-        # Developer mode checkbox (restart required)
-        self.checkBox_developerMode = self.findChild(QCheckBox, 'checkBox_developerMode')
-        if self.checkBox_developerMode is not None:
-            self.checkBox_developerMode.setChecked(self.settings.get('developerMode', 0))
-        
+        self.tab_other = self.findChild(QWidget, "tab_other")
+        self.tab_drive = self.findChild(QWidget, "tab_drive")
+        self.checkBox_developerMode = self.findChild(QCheckBox, "checkBox_developerMode")
+        self._dev_unlock_clicks = 0
+        self._dev_unlock_timer = QTimer(self)
+        self._dev_unlock_timer.setSingleShot(True)
+        self._dev_unlock_timer.timeout.connect(self._reset_dev_unlock_clicks)
+        self._configure_developer_mode_ui()
+        self.tabWidget.tabBarClicked.connect(self._on_preferences_tab_clicked)
+
         # library tab
         self.plainTextEdit_mainlib = self.findChild(QPlainTextEdit, 'plainTextEdit_mainlib')
         self.plainTextEdit_mainlib.setPlainText(self.settings.get('mainlib_path', ""))
@@ -76,6 +84,13 @@ class window_preferences(QDialog):
 
         self.button_libdefault = self.findChild(QPushButton, 'button_libdefault')
         self.button_libdefault.clicked.connect(self.libdefault)
+
+        # worksheet tab
+        self.gridLayout_worksheet_columns = self.findChild(
+            QGridLayout, "gridLayout_worksheet_columns"
+        )
+        if self.gridLayout_worksheet_columns is not None:
+            self._populate_worksheet_columns_grid()
 
         #hotkey tab
         self.hotkey_strings = [
@@ -207,6 +222,44 @@ class window_preferences(QDialog):
         self.checkBox_esc_to_system_tray = self.findChild(QCheckBox, 'checkBox_esc_to_system_tray')
         if rt.settings.get('esc_to_system_tray',0):
             self.checkBox_esc_to_system_tray.setChecked(True)
+
+    def _configure_developer_mode_ui(self) -> None:
+        if self.tab_drive is not None and not rt.developerMode:
+            drive_index = self.tabWidget.indexOf(self.tab_drive)
+            if drive_index >= 0:
+                self.tabWidget.removeTab(drive_index)
+
+        if self.checkBox_developerMode is not None:
+            self.checkBox_developerMode.setChecked(bool(self.settings.get("developerMode", 0)))
+            self.checkBox_developerMode.setVisible(bool(rt.developerMode))
+
+    def _reset_dev_unlock_clicks(self) -> None:
+        self._dev_unlock_clicks = 0
+
+    def _reveal_developer_mode_checkbox(self) -> None:
+        if self.checkBox_developerMode is None:
+            return
+        self.checkBox_developerMode.setVisible(True)
+        if self.tab_other is not None:
+            self.tabWidget.setCurrentWidget(self.tab_other)
+        logging.getLogger(__name__).debug("Developer mode checkbox revealed via unlock gesture")
+
+    def _on_preferences_tab_clicked(self, index: int) -> None:
+        if self.tab_other is None or self.tabWidget.widget(index) is not self.tab_other:
+            return
+        mods = QApplication.keyboardModifiers()
+        if not (
+            mods & Qt.KeyboardModifier.ControlModifier
+            and mods & Qt.KeyboardModifier.ShiftModifier
+        ):
+            return
+
+        self._dev_unlock_clicks += 1
+        self._dev_unlock_timer.start(3000)
+        if self._dev_unlock_clicks >= 5:
+            self._dev_unlock_clicks = 0
+            self._dev_unlock_timer.stop()
+            self._reveal_developer_mode_checkbox()
 
     def setmainlib(self):  
         folder_path = self.select_folder()
@@ -347,6 +400,65 @@ class window_preferences(QDialog):
         if self.checkbox_mainlib_include_subfolders is not None:
             self.checkbox_mainlib_include_subfolders.setChecked(False)
 
+    def _populate_worksheet_columns_grid(self):
+        headers = ("Column", "", "Definition", "Example", "Use")
+        for col, text in enumerate(headers):
+            lbl = QLabel(text)
+            self.gridLayout_worksheet_columns.addWidget(lbl, 0, col)
+
+        rows = [
+            ("Ref", "PMID", "33301246"),
+            ("DOI", "DOI", "10.1056/NEJMoa2034577"),
+            ("AuthorYear", "Author, year", "Polack et al., 2020"),
+            ("Authors", "Author list", "Polack FP, Thomas SJ, Kitchin N, Absalon J, Gurtman A, Lockhart S, ..."),
+            ("Year", "Year", "2020"),
+            ("Journal", "Journal", "N Engl J Med"),
+            ("IF2024", "2024 Journal Impact Factor", "78.5"),
+            ("Title", "Title", "Safety and Efficacy of the BNT162b2 mRNA Covid-19 Vaccine."),
+            ("Abstract", "Abstract", "BACKGROUND: Severe acute respiratory syndrome coronavirus 2 ..."),
+            ("Citation", "NLM-style citation", "Polack et al. Safety and Efficacy of the BNT162b2 mRNA Covid-19 Vaccine. N Engl J Med. 2020 Dec 31;383(27):2603-2615. PMID: 33301246."),
+            ("Citation2024", "NLM-style citation with 2024 IF", "Polack et al. Safety and Efficacy of the BNT162b2 mRNA Covid-19 Vaccine. N Engl J Med (IF: 78.5). 2020 Dec 31;383(27):2603-2615. PMID: 33301246."),
+            ("Q2024", "2024 Journal Quartile", "Q1"),
+            ("Identifier", "Secondary identifier", "ClinicalTrials.gov/NCT04368728"),
+            ("Funding", "Grant/funding", "—"),
+        ]
+
+        default_enabled = {
+            "Ref": True,
+            "Title": True,
+            "AuthorYear": True,
+            "Journal": True,
+            "Abstract": True,
+            "Citation": True,
+            "IF2024": True,
+        }
+        locked_on = {"Ref", "Title"}
+        settings_enabled = self.settings.get("worksheet_column_enabled", {})
+        self.worksheet_column_checks = {}
+
+        for row_idx, (col_name, definition, example) in enumerate(rows, start=1):
+            label_col = QLabel(col_name)
+            label_col.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            button_copy = QPushButton("Copy")
+            button_copy.clicked.connect(lambda _, s=col_name: write_clipboard(s))
+            label_def = QLabel(definition)
+            label_ex = QLabel(example)
+            label_ex.setWordWrap(True)
+            label_ex.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+            checkbox_use = QCheckBox()
+            enabled_default = default_enabled.get(col_name, False)
+            checked = bool(settings_enabled.get(col_name, 1 if enabled_default else 0))
+            if col_name in locked_on:
+                checked = True
+                checkbox_use.setEnabled(False)
+            checkbox_use.setChecked(checked)
+            self.worksheet_column_checks[col_name] = checkbox_use
+            self.gridLayout_worksheet_columns.addWidget(label_col, row_idx, 0)
+            self.gridLayout_worksheet_columns.addWidget(button_copy, row_idx, 1)
+            self.gridLayout_worksheet_columns.addWidget(label_def, row_idx, 2)
+            self.gridLayout_worksheet_columns.addWidget(label_ex, row_idx, 3)
+            self.gridLayout_worksheet_columns.addWidget(checkbox_use, row_idx, 4)
+
     def hotdefault(self):
         self.groupBox_open.setChecked(True)
         self.groupBox_inspect.setChecked(True)
@@ -450,10 +562,22 @@ class window_preferences(QDialog):
 
         new_settings['close_to_system_tray'] = 1 if self.checkBox_close_to_system_tray.isChecked() else 0
         new_settings['esc_to_system_tray'] = 1 if self.checkBox_esc_to_system_tray.isChecked() else 0
+        if hasattr(self, "worksheet_column_checks"):
+            worksheet_column_enabled = {
+                name: 1 if checkbox.isChecked() else 0
+                for name, checkbox in self.worksheet_column_checks.items()
+            }
+            worksheet_column_enabled["Ref"] = 1
+            worksheet_column_enabled["Title"] = 1
+            new_settings["worksheet_column_enabled"] = worksheet_column_enabled
 
-        # Developer mode checkbox (restart required)
-        if hasattr(self, "checkBox_developerMode") and self.checkBox_developerMode is not None:
-            new_settings['developerMode'] = 1 if self.checkBox_developerMode.isChecked() else 0
+        # Developer mode (restart required). Only persist when the checkbox is visible.
+        if (
+            hasattr(self, "checkBox_developerMode")
+            and self.checkBox_developerMode is not None
+            and self.checkBox_developerMode.isVisible()
+        ):
+            new_settings["developerMode"] = 1 if self.checkBox_developerMode.isChecked() else 0
 
         # Hotkeys (keep existing behaviour)
         self.hotkey_open = ""

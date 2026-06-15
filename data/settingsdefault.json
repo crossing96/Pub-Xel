@@ -15,5 +15,21 @@
     "esc_to_system_tray": 1,
     "system_tray_notice_shown": 0,
     "worksheet_count": 0,
-    "recent_worksheets": []
+    "recent_worksheets": [],
+    "worksheet_column_enabled": {
+        "Ref": 1,
+        "DOI": 0,
+        "AuthorYear": 1,
+        "Authors": 0,
+        "Year": 0,
+        "Journal": 1,
+        "IF2024": 1,
+        "Title": 1,
+        "Abstract": 1,
+        "Citation": 1,
+        "Citation2024": 0,
+        "Q2024": 0,
+        "Identifier": 0,
+        "Funding": 0
+    }
 }

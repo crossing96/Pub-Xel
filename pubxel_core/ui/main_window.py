@@ -346,10 +346,7 @@ class main_window(QMainWindow):
             if file_dialog.exec() == QFileDialog.DialogCode.Accepted:
                 file_path = file_dialog.selectedFiles()[0]
                 try:
-                    if rt.settings["worksheet_count"] > 0:
-                        shutil.copyfile(rt.pubsheet_path, file_path)
-                    else:
-                        shutil.copyfile(rt.pubsheetinitial_path, file_path)
+                    shutil.copyfile(rt.pubsheet_path, file_path)
                     self.save_success_dialog(file_path)
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"Failed to save file: {str(e)}")

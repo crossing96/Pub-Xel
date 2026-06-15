@@ -686,6 +686,41 @@ Combinations of Ctrl, Alt, Shift, and alphabets (a~z) are allowed.
        </item>
       </layout>
      </widget>
+     <widget class="QWidget" name="tab_worksheet">
+      <attribute name="title">
+       <string>Worksheet</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="verticalLayout_worksheet">
+       <item>
+        <widget class="QLabel" name="label_worksheet">
+         <property name="text">
+          <string>Worksheet columns for PubMed import. Copy names from the list below and paste into row 1 of your worksheet.</string>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QScrollArea" name="scrollArea_worksheet_columns">
+         <property name="widgetResizable">
+          <bool>true</bool>
+         </property>
+         <widget class="QWidget" name="scrollLayout_worksheet">
+          <property name="geometry">
+           <rect>
+            <x>0</x>
+            <y>0</y>
+            <width>560</width>
+            <height>340</height>
+           </rect>
+          </property>
+          <layout class="QGridLayout" name="gridLayout_worksheet_columns" columnstretch="1,1,2,6"/>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
      <widget class="QWidget" name="tab_other">
       <attribute name="title">
        <string>Other</string>
