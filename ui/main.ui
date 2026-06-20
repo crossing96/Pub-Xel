@@ -460,6 +460,7 @@
      <string>File</string>
     </property>
     <addaction name="actionNew_Excel_Template"/>
+    <addaction name="actionOpen"/>
     <addaction name="separator"/>
     <addaction name="actionOpen_Library_Folder"/>
     <addaction name="actionOpen_Output_Folder"/>
@@ -535,6 +536,11 @@
   <action name="actionWorksheetColumns">
    <property name="text">
     <string>View Worksheet Columns</string>
+   </property>
+  </action>
+  <action name="actionOpen">
+   <property name="text">
+    <string>Open...</string>
    </property>
   </action>
  </widget>

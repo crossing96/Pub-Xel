@@ -413,12 +413,12 @@ class window_preferences(QDialog):
             ("Authors", "Author list", "Polack FP, Thomas SJ, Kitchin N, Absalon J, Gurtman A, Lockhart S, ..."),
             ("Year", "Year", "2020"),
             ("Journal", "Journal", "N Engl J Med"),
-            ("IF2024", "2024 Journal Impact Factor", "78.5"),
             ("Title", "Title", "Safety and Efficacy of the BNT162b2 mRNA Covid-19 Vaccine."),
             ("Abstract", "Abstract", "BACKGROUND: Severe acute respiratory syndrome coronavirus 2 ..."),
             ("Citation", "NLM-style citation", "Polack et al. Safety and Efficacy of the BNT162b2 mRNA Covid-19 Vaccine. N Engl J Med. 2020 Dec 31;383(27):2603-2615. PMID: 33301246."),
-            ("Citation2024", "NLM-style citation with 2024 IF", "Polack et al. Safety and Efficacy of the BNT162b2 mRNA Covid-19 Vaccine. N Engl J Med (IF: 78.5). 2020 Dec 31;383(27):2603-2615. PMID: 33301246."),
-            ("Q2024", "2024 Journal Quartile", "Q1"),
+            ("Citation2025", "NLM-style citation with 2025 IF", "Polack et al. Safety and Efficacy of the BNT162b2 mRNA Covid-19 Vaccine. N Engl J Med (IF: 84.5). 2020 Dec 31;383(27):2603-2615. PMID: 33301246."),
+            ("IF2025", "2025 Journal Impact Factor", "84.5"),
+            ("Q2025", "2025 Journal Quartile", "Q1"),
             ("Identifier", "Secondary identifier", "ClinicalTrials.gov/NCT04368728"),
             ("Funding", "Grant/funding", "—"),
         ]
@@ -430,7 +430,7 @@ class window_preferences(QDialog):
             "Journal": True,
             "Abstract": True,
             "Citation": True,
-            "IF2024": True,
+            "IF2025": True,
         }
         locked_on = {"Ref", "Title"}
         settings_enabled = self.settings.get("worksheet_column_enabled", {})

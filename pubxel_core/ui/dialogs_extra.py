@@ -38,12 +38,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from data.version import __version__
 from pubxel_core import runtime as rt
 from pubxel_core.excel_ops import check_file_exist, copy_list, files_name_to_path, process_ids
-from pubxel_core.pubmed import input_pubmed_data
 from pubxel_core.ids import list_to_string, string_to_list
-from pubxel_core.pubmed import obtain_pubmed_data
+from pubxel_core.nbib import NBIB_EXCEL_MAX_ARTICLES
+from pubxel_core.pubmed import input_pubmed_data, obtain_pubmed_data
 from pubxel_core.settings import save_settings, save_settings_key
 from pubxel_core.ui.helpers import dialog_onebutton, dirname, open_directory, try_open_directory
 
@@ -90,6 +89,81 @@ class PopupInstructions(QWidget):
         self.setMaximumWidth(800)
     def focusOutEvent(self, event):
         self.close()
+
+
+class NbibImportChoice:
+    CANCEL = "cancel"
+    EXCEL = "excel"
+    TSV = "tsv"
+
+
+TSV_IMPORT_HINT = (
+    "You can open the TSV, copy the table, and paste it into a Pub-Xel worksheet."
+)
+
+
+class NbibImportDialog(QDialog):
+    """Offer Excel or TSV export based on nbib article count."""
+
+    def __init__(self, parent=None, article_count: int = 0):
+        super().__init__(parent)
+        self._choice = NbibImportChoice.CANCEL
+        self.setWindowTitle("Import PubMed nbib")
+        self.setModal(True)
+        self.setMinimumWidth(280)
+        self.setMaximumWidth(320)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        label = QLabel(f"{article_count} PubMed article(s) found in this file.")
+        label.setWordWrap(True)
+        layout.addWidget(label)
+
+        is_tsv = article_count > NBIB_EXCEL_MAX_ARTICLES
+        if is_tsv:
+            hint = QLabel(TSV_IMPORT_HINT)
+            hint.setWordWrap(True)
+            hint_font = hint.font()
+            hint_font.setItalic(True)
+            hint.setFont(hint_font)
+            layout.addWidget(hint)
+
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(8)
+
+        if is_tsv:
+            primary_button = QPushButton("Make TSV File")
+            primary_button.clicked.connect(self._choose_tsv)
+        else:
+            primary_button = QPushButton("Make Excel Worksheet")
+            primary_button.clicked.connect(self._choose_excel)
+
+        primary_button.setDefault(True)
+        primary_button.setAutoDefault(True)
+
+        cancel_button = QPushButton("Cancel")
+        cancel_button.clicked.connect(self.reject)
+
+        button_layout.addWidget(primary_button)
+        button_layout.addStretch()
+        button_layout.addWidget(cancel_button)
+        layout.addLayout(button_layout)
+
+        primary_button.setFocus()
+
+    def _choose_excel(self) -> None:
+        self._choice = NbibImportChoice.EXCEL
+        self.accept()
+
+    def _choose_tsv(self) -> None:
+        self._choice = NbibImportChoice.TSV
+        self.accept()
+
+    def choice(self) -> str:
+        return self._choice
+
 
 class RunningFunctionDialog(QDialog):
     def __init__(self, parent=None, message=None):

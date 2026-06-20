@@ -16,18 +16,18 @@ class WorksheetColumnDefault(TypedDict):
 
 
 DEFAULT_WORKSHEET_COLUMN_LAYOUT: List[WorksheetColumnDefault] = [
-    {"column_name": "Ref", "default_width": 8.25, "default_wrap": False},
+    {"column_name": "Ref", "default_width": 10.25, "default_wrap": False},
     {"column_name": "DOI", "default_width": 8.25, "default_wrap": False},
     {"column_name": "AuthorYear", "default_width": 16.25, "default_wrap": True},
     {"column_name": "Authors", "default_width": 8.25, "default_wrap": False},
     {"column_name": "Year", "default_width": 8.25, "default_wrap": False},
     {"column_name": "Journal", "default_width": 12.25, "default_wrap": True},
-    {"column_name": "Title", "default_width": 44.25, "default_wrap": True},
+    {"column_name": "Title", "default_width": 52.38, "default_wrap": True},
     {"column_name": "Abstract", "default_width": 8.25, "default_wrap": False},
-    {"column_name": "Citation", "default_width": 44.25, "default_wrap": True},
-    {"column_name": "Citation2024", "default_width": 44.25, "default_wrap": True},
-    {"column_name": "IF2024", "default_width": 8.25, "default_wrap": False},
-    {"column_name": "Q2024", "default_width": 8.25, "default_wrap": False},
+    {"column_name": "Citation", "default_width": 73.31, "default_wrap": True},
+    {"column_name": "Citation2025", "default_width": 73.31, "default_wrap": True},
+    {"column_name": "IF2025", "default_width": 8.25, "default_wrap": False},
+    {"column_name": "Q2025", "default_width": 8.25, "default_wrap": False},
     {"column_name": "Identifier", "default_width": 8.25, "default_wrap": False},
     {"column_name": "Funding", "default_width": 8.25, "default_wrap": False},
 ]

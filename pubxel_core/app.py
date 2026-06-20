@@ -20,6 +20,7 @@ from pubxel_core.ui.helpers import graceful_shutdown, stop_listeners
 from pubxel_core.ui.main_window import main_window
 from pubxel_core.ui.workers import check_shortcut, listenerWorker
 from pubxel_core.update import check_for_update
+from pubxel_core.worksheet_builder import create_worksheet
 
 _bootstrapped = False
 
@@ -103,16 +104,19 @@ def bootstrap():
 
     files_to_copy = {
         rt.settingsdefault_path: settings_path,
-        rt.pubsheetdefault_path: rt.pubsheet_path,
         rt.pubsheetinitialdefault_path: rt.pubsheetinitial_path,
     }
     for source_path, dest_path in files_to_copy.items():
-        if dest_path == rt.pubsheet_path or dest_path == rt.pubsheetinitial_path or not os.path.exists(dest_path):
+        if dest_path == rt.pubsheetinitial_path or not os.path.exists(dest_path):
             shutil.copy(source_path, dest_path)
             print(f"Copied {source_path} as {dest_path}")
 
     _merge_default_settings(rt.settingsdefault_path, settings_path)
     rt.settings = load_settings()
+
+    if not os.path.exists(rt.pubsheet_path):
+        create_worksheet(rt.pubsheet_path, settings=rt.settings)
+        print(f"Created {rt.pubsheet_path}")
 
     if os_name == "Windows":
         documents_path = os.path.join(os.environ["USERPROFILE"], "Documents")

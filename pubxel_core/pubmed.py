@@ -7,10 +7,8 @@
 # (at your option) any later version.
 
 import datetime
-import os
 import re
-import time
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import requests
 import xlwings as xw
@@ -24,7 +22,7 @@ from pubxel_core.metadata_store import (
     MetadataStore,
     enrich_metadata,
 )
-from pubxel_core.paths import data_dir, metadata_path
+from pubxel_core.paths import journal_combined_path, metadata_path
 
 
 def value_from_dict(
@@ -65,6 +63,210 @@ def normalize_pmid_list(PMID_list: Union[str, List[str]]) -> List[str]:
     PMID_list = [PMID for PMID in PMID_list if PMID.isnumeric()]
     PMID_list = [PMID for PMID in PMID_list if len(PMID) <= 9]
     return PMID_list
+
+
+def _normalize_medline_segment(segment: str) -> str:
+    return segment.replace("\r\n", "\n").replace("\n", "\r\n")
+
+
+def _medline_to_dict(text: str) -> Dict[str, str]:
+    text = text.replace(" \r\n      ", " ")
+    text = text.replace("\r\n      ", " ")
+    result: Dict[str, str] = {}
+    for line in text.strip().split("\r\n"):
+        if "- " in line:
+            key, value = line.split("- ", 1)
+            key = key.rstrip()
+            value = value.rstrip()
+            if key in result:
+                result[key] += "|" + value
+            else:
+                result[key] = value
+    return result
+
+
+def _get_first_doi_value(values: Any) -> str:
+    try:
+        if not isinstance(values, list):
+            return ""
+        for v in values:
+            if isinstance(v, str) and v.endswith(" [doi]"):
+                return v[:-6]
+        return ""
+    except Exception:
+        return ""
+
+
+def _empty_to_none(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, str) and value.strip() == "":
+        return None
+    return value
+
+
+def _parse_authors_from_segment(segment: str) -> List[Dict[str, Any]]:
+    authors: List[Dict[str, Any]] = []
+    for raw_line in _normalize_medline_segment(segment).split("\r\n"):
+        line = raw_line.rstrip("\n")
+        if not line.strip():
+            continue
+        m = re.match(r"^(CN|FAU|AU)\s*-\s*(.*)$", line)
+        if not m:
+            continue
+        tag, value = m.group(1), m.group(2).strip()
+        if value == "":
+            continue
+        if tag == "CN":
+            authors.append({"type": "CORPORATE", "full_name": value, "short_name": None})
+        elif tag == "FAU":
+            authors.append({"type": "PERSON", "full_name": value, "short_name": None})
+        elif tag == "AU":
+            attached = False
+            for i in range(len(authors) - 1, -1, -1):
+                if authors[i]["type"] == "PERSON" and authors[i]["short_name"] is None:
+                    authors[i]["short_name"] = value
+                    attached = True
+                    break
+            if not attached:
+                authors.append({"type": "PERSON", "full_name": None, "short_name": value})
+    return authors
+
+
+def _rows_from_medline_segment(
+    pmid: str,
+    segment: str,
+    retrievedate: str,
+) -> Tuple[Optional[ArticleRow], List[AuthorRow]]:
+    segment = _normalize_medline_segment(segment)
+    pmid_dict = _medline_to_dict(segment)
+
+    title = value_from_dict(pmid_dict, "TI", outputtype="string", default="")
+    abstract = value_from_dict(pmid_dict, "AB", outputtype="string", default="")
+    journal = value_from_dict(pmid_dict, "TA", outputtype="string", default="")
+    fulljournal = value_from_dict(pmid_dict, "JT", outputtype="string", default="")
+    source = value_from_dict(pmid_dict, "SO", outputtype="string", default="")
+    date_str = value_from_dict(pmid_dict, "DP", outputtype="string", default="")
+    language = value_from_dict(pmid_dict, "LA", outputtype="string", default="")
+    publicationtype = value_from_dict(pmid_dict, "PT", outputtype="string", default="")
+    issn = value_from_dict(pmid_dict, "IS", outputtype="string", default="")
+    si = value_from_dict(pmid_dict, "SI", outputtype="string", default="")
+    gr = value_from_dict(pmid_dict, "GR", outputtype="string", default="")
+    cin = value_from_dict(pmid_dict, "CIN", outputtype="string", default="")
+    volume = value_from_dict(pmid_dict, "VI", outputtype="string", default="")
+    issue = value_from_dict(pmid_dict, "IP", outputtype="string", default="")
+    page = value_from_dict(pmid_dict, "PG", outputtype="string", default="")
+    provider = value_from_dict(pmid_dict, "OWN", outputtype="string", default="")
+
+    year = None
+    if date_str:
+        m_year = re.search(r"\b(\d{4})\b", date_str)
+        if m_year:
+            year = m_year.group(1)
+
+    aid_list = value_from_dict(pmid_dict, "AID", outputtype="list", default=[])
+    doi = _get_first_doi_value(aid_list)
+
+    accession = pmid
+    title = _empty_to_none(title)
+    abstract = _empty_to_none(abstract)
+    journal = _empty_to_none(journal)
+    fulljournal = _empty_to_none(fulljournal)
+    source = _empty_to_none(source)
+    date_str = _empty_to_none(date_str)
+    year = _empty_to_none(year)
+    language = _empty_to_none(language)
+    publicationtype = _empty_to_none(publicationtype)
+    issn = _empty_to_none(issn)
+    si = _empty_to_none(si)
+    gr = _empty_to_none(gr)
+    cin = _empty_to_none(cin)
+    volume = _empty_to_none(volume)
+    issue = _empty_to_none(issue)
+    page = _empty_to_none(page)
+    provider = _empty_to_none(provider)
+    doi = _empty_to_none(doi)
+    link = f"https://pubmed.ncbi.nlm.nih.gov/{pmid}" if pmid else None
+
+    article_row: ArticleRow = (
+        accession,
+        pmid,
+        title,
+        abstract,
+        journal,
+        year,
+        source,
+        date_str,
+        doi,
+        link,
+        volume,
+        issue,
+        page,
+        language,
+        publicationtype,
+        fulljournal,
+        issn,
+        si,
+        gr,
+        cin,
+        retrievedate,
+        provider,
+    )
+
+    authors_rows: List[AuthorRow] = []
+    authors = _parse_authors_from_segment(segment)
+    for idx, author in enumerate(authors, start=1):
+        authors_rows.append(
+            (
+                accession,
+                idx,
+                author.get("type"),
+                _empty_to_none(author.get("full_name")),
+                _empty_to_none(author.get("short_name")),
+            )
+        )
+
+    return article_row, authors_rows
+
+
+def _upsert_medline_segments(segments: List[Tuple[str, str]]) -> MetadataDict:
+    retrievedate = datetime.date.today().isoformat()
+    articles_rows: List[ArticleRow] = []
+    authors_rows: List[AuthorRow] = []
+
+    for pmid, segment in segments:
+        article_row, author_rows = _rows_from_medline_segment(pmid, segment, retrievedate)
+        if article_row:
+            articles_rows.append(article_row)
+            authors_rows.extend(author_rows)
+
+    if not articles_rows and not authors_rows:
+        return {}
+
+    store = MetadataStore(metadata_path)
+    try:
+        store.upsert_metadata(articles_rows, authors_rows)
+        accessions = [row[0] for row in articles_rows if row[0]]
+        raw = store.get_metadata(accessions)
+        return enrich_metadata(raw)
+    finally:
+        store.close()
+
+
+def import_nbib_to_metadata(records: List[str]) -> MetadataDict:
+    """Parse PubMed nbib MEDLINE records and upsert into SQLite (no network)."""
+    segments: List[Tuple[str, str]] = []
+    for record in records:
+        segment = _normalize_medline_segment(record)
+        pmid = None
+        for line in segment.split("\r\n"):
+            if line.startswith("PMID-"):
+                pmid = normalize_pmid(line.split("-", 1)[1].strip())
+                break
+        if not pmid:
+            raise ValueError("Can only import .nbib file from PubMed")
+        segments.append((pmid, segment))
+    return _upsert_medline_segments(segments)
 
 
 def resolve_metadata_for_pmids(
@@ -115,139 +317,11 @@ def obtain_pubmed_data(PMID_list: Union[str, List[str]]) -> MetadataDict:
 
     Fetches from the NCBI ctxp API, upserts into ``metadata_article.sqlite``,
     then returns ``enrich_metadata(store.get_metadata(...))`` for callers.
-
-    Returns
-    -------
-    MetadataDict
-        ``{ pmid: { "article": {...}, "authors": [...] } }`` with citation fields
-        added by ``enrich_metadata`` (cite, authoryear, etc.).
     """
-
     PMID_list = normalize_pmid_list(PMID_list)
     if not PMID_list:
         return {}
 
-    def html_to_dict(text):
-        """
-        Convert MEDLINE-like text block into a dict of key -> '|' joined values.
-        Non-author / non-CN fields can be safely read from here.
-
-        This is not used for author order, only for quick value lookup.
-        """
-        text = text.replace(" \r\n      ", " ")
-        text = text.replace("\r\n      ", " ")
-        result = {}
-        for line in text.strip().split("\r\n"):
-            if "- " in line:
-                key, value = line.split("- ", 1)
-                key = key.rstrip()
-                value = value.rstrip()
-                if key in result:
-                    result[key] += "|" + value
-                else:
-                    result[key] = value
-        return result
-
-    def get_first_doi_value(values):
-        """
-        Returns the first DOI string (without ' [doi]') from a list.
-        If no valid DOI is found or input is invalid, returns an empty string.
-        """
-        try:
-            if not isinstance(values, list):
-                return ""
-            for v in values:
-                if isinstance(v, str) and v.endswith(" [doi]"):
-                    return v[:-6]  # strip " [doi]"
-            return ""
-        except Exception:
-            return ""
-
-    def empty_to_none(value):
-        """
-        Convert empty string or whitespace-only string to None.
-        Anything else is returned as-is.
-        """
-        if value is None:
-            return None
-        if isinstance(value, str) and value.strip() == "":
-            return None
-        return value
-
-    def parse_authors_from_segment(segment):
-        """
-        Parse CN / FAU / AU in correct MEDLINE order from a raw segment string.
-
-        Returns
-        -------
-        authors : list of dicts
-            Each dict:
-              {
-                "type": "PERSON" or "CORPORATE",
-                "full_name": <str or None>,
-                "short_name": <str or None>
-              }
-
-        Rules / quirks handled:
-        - CN can appear anywhere and multiple times.
-        - FAU and AU may be missing or mismatched.
-        - AU without preceding FAU produces an author with short_name only.
-        - Titles / abstracts etc are ignored here; only CN/FAU/AU processed.
-        - Papers with only CN and no human authors are supported.
-        - AU may represent corporate names in disguise; we do not try to guess,
-          we just treat AU as PERSON unless paired with CN.
-        """
-        authors = []
-
-        # Break by line, but keep as-is to preserve order
-        for raw_line in segment.split("\r\n"):
-            line = raw_line.rstrip("\n")
-            if not line.strip():
-                continue
-
-            m = re.match(r"^(CN|FAU|AU)\s*-\s*(.*)$", line)
-            if not m:
-                continue
-
-            tag, value = m.group(1), m.group(2).strip()
-            if value == "":
-                continue
-
-            if tag == "CN":
-                # Corporate author / collaboration group
-                authors.append({
-                    "type": "CORPORATE",
-                    "full_name": value,
-                    "short_name": None,
-                })
-
-            elif tag == "FAU":
-                # Full author name (person)
-                authors.append({
-                    "type": "PERSON",
-                    "full_name": value,
-                    "short_name": None,
-                })
-
-            elif tag == "AU":
-                # Short author name, should attach to last PERSON without short_name
-                attached = False
-                for i in range(len(authors) - 1, -1, -1):
-                    if authors[i]["type"] == "PERSON" and authors[i]["short_name"] is None:
-                        authors[i]["short_name"] = value
-                        attached = True
-                        break
-                if not attached:
-                    # AU without FAU before it → treat as standalone PERSON with short_name only
-                    authors.append({
-                        "type": "PERSON",
-                        "full_name": None,
-                        "short_name": value,
-                    })
-
-        return authors
-
-    # Build ID string for NCBI ctxp API
     if len(PMID_list) > 1:
         PMID_list_str = ",".join(PMID_list)
     else:
@@ -260,9 +334,6 @@ def obtain_pubmed_data(PMID_list: Union[str, List[str]]) -> MetadataDict:
     if n_articles > 5:
         preview = f"{preview}, ..."
     print(f"Obtaining PubMed data for {n_articles} article(s): {preview}")
-
-    # DEBUG: artificial delay before network request (remove when done debugging)
-    time.sleep(3)
 
     try:
         response = requests.get(url, timeout=10)
@@ -283,174 +354,386 @@ def obtain_pubmed_data(PMID_list: Union[str, List[str]]) -> MetadataDict:
     if not data.startswith("PMID"):
         raise ValueError("Error.\nInvalid PMID(s). Please try again.")
 
-    # Map each PMID to its raw MEDLINE segment
-    html_dict = {}
-    segments = data.split("\r\n\r\n")
-    for segment in segments:
-        lines = segment.split("\r\n")
-        for line in lines:
+    html_dict: Dict[str, str] = {}
+    for segment in data.split("\r\n\r\n"):
+        for line in segment.split("\r\n"):
             if line.startswith("PMID"):
                 pmid_key = line.split("-", 1)[1].strip()
                 html_dict[pmid_key] = segment
                 break
 
-    articles_rows = []
-    authors_rows = []
+    segments: List[Tuple[str, str]] = []
+    for pmid in PMID_list:
+        if pmid in html_dict:
+            segments.append((pmid, html_dict[pmid]))
 
-    retrievedate = datetime.date.today().isoformat()  # YYYY-MM-DD
+    return _upsert_medline_segments(segments)
 
-    # Build SQL-input-friendly rows
-    for PMID in PMID_list:
-        if PMID not in html_dict:
+
+# Worksheet column header (lowercase) -> internal field key
+WORKSHEET_COLUMN_HEADER: Dict[str, str] = {
+    "ref": "pmid",
+    "doi": "doi",
+    "funding": "gr",
+    "grants": "gr",
+    "identifier": "si",
+    "secondaryid": "si",
+    "firstauthor": "fa",
+    "author": "au",
+    "year": "yr",
+    "authoryear": "fayr",
+    "journal": "jo",
+    "title": "ti",
+    "abstract": "ab",
+    "citation": "cite",
+    "output2": "ou2",
+    "authors": "au2",
+    "if2022": "if2022",
+    "citation2022": "cite2022",
+    "q2022": "q2022",
+    "if2023": "if2023",
+    "citation2023": "cite2023",
+    "q2023": "q2023",
+    "if2024": "if2024",
+    "citation2024": "cite2024",
+    "q2024": "q2024",
+    "if2025": "if2025",
+    "citation2025": "cite2025",
+    "q2025": "q2025",
+}
+
+
+def _sql_if_empty(value: Any) -> str:
+    if value == "" or value is None:
+        return "-"
+    return value
+
+
+def _journal_if_empty(value: Any) -> str:
+    if value == "" or value is None:
+        return "-"
+    return value
+
+
+def parse_pmid_cell_value(value: Any) -> Optional[str]:
+    """Normalize a worksheet cell value to a PMID string, or None if invalid."""
+    if isinstance(value, int) and value > 0:
+        return str(value)
+    if isinstance(value, float) and value > 0 and value.is_integer():
+        return str(int(value))
+    if isinstance(value, str):
+        s = value.strip()
+        if s.replace(".", "", 1).isdigit():
+            f = float(s)
+            if f > 0 and f.is_integer():
+                return str(int(f))
+    return None
+
+
+def build_worksheet_header_map(header_names: List[Any]) -> Dict[str, int]:
+    """Map internal field keys to 0-based column indices from row-1 header labels."""
+    header2: Dict[str, int] = {}
+    for col_idx, name in enumerate(header_names):
+        if name is None:
             continue
+        key = WORKSHEET_COLUMN_HEADER.get(str(name).lower())
+        if key is not None:
+            header2[key] = col_idx
+    return header2
 
-        segment = html_dict[PMID]
-        PMID_dict = html_to_dict(segment)
 
-        # Core bibliographic fields
-        title = value_from_dict(PMID_dict, "TI", outputtype="string", default="")
-        abstract = value_from_dict(PMID_dict, "AB", outputtype="string", default="")
-        journal = value_from_dict(PMID_dict, "TA", outputtype="string", default="")
-        fulljournal = value_from_dict(PMID_dict, "JT", outputtype="string", default="")
-        source = value_from_dict(PMID_dict, "SO", outputtype="string", default="")
-        date_str = value_from_dict(PMID_dict, "DP", outputtype="string", default="")
-        language = value_from_dict(PMID_dict, "LA", outputtype="string", default="")
-        publicationtype = value_from_dict(PMID_dict, "PT", outputtype="string", default="")
-        issn = value_from_dict(PMID_dict, "IS", outputtype="string", default="")
-        si = value_from_dict(PMID_dict, "SI", outputtype="string", default="")
-        gr = value_from_dict(PMID_dict, "GR", outputtype="string", default="")
-        cin = value_from_dict(PMID_dict, "CIN", outputtype="string", default="")
-        volume = value_from_dict(PMID_dict, "VI", outputtype="string", default="")
-        issue = value_from_dict(PMID_dict, "IP", outputtype="string", default="")
-        page = value_from_dict(PMID_dict, "PG", outputtype="string", default="")
-        provider = value_from_dict(PMID_dict, "OWN", outputtype="string", default="")
-
-        # Year: pull first 4-digit number from DP; if none, store None
-        year = None
-        if date_str:
-            m_year = re.search(r"\b(\d{4})\b", date_str)
-            if m_year:
-                year = m_year.group(1)
-
-        # DOI: use AID as list and pick first [doi]
-        aid_list = value_from_dict(PMID_dict, "AID", outputtype="list", default=[])
-        doi = get_first_doi_value(aid_list)
-
-        # Normalize empties to None for SQL NULLs
-        accession = PMID  # accession = PMID string, primary key in SQL
-        pmid = PMID  # same as accession, non-PK column
-        title = empty_to_none(title)
-        abstract = empty_to_none(abstract)
-        journal = empty_to_none(journal)
-        fulljournal = empty_to_none(fulljournal)
-        source = empty_to_none(source)
-        date_str = empty_to_none(date_str)
-        year = empty_to_none(year)
-        language = empty_to_none(language)
-        publicationtype = empty_to_none(publicationtype)
-        issn = empty_to_none(issn)
-        si = empty_to_none(si)
-        gr = empty_to_none(gr)
-        cin = empty_to_none(cin)
-        volume = empty_to_none(volume)
-        issue = empty_to_none(issue)
-        page = empty_to_none(page)
-        provider = empty_to_none(provider)
-        doi = empty_to_none(doi)
-
-        # Link is always derived from PMID string
-        link = f"https://pubmed.ncbi.nlm.nih.gov/{PMID}" if PMID else None
-
-        # Main article row (for main table)
-        article_row = (
-            accession,  # accession (TEXT, PRIMARY KEY)
-            pmid,  # pmid (TEXT)
-            title,  # title (TEXT)
-            abstract,  # abstract (TEXT)
-            journal,  # journal (TEXT)
-            year,  # year (TEXT)
-            source,  # source (TEXT, 'SO')
-            date_str,  # date (TEXT, 'DP')
-            doi,  # doi (TEXT)
-            link,  # link (TEXT)
-            volume,  # volume (TEXT)
-            issue,  # issue (TEXT)
-            page,  # page (TEXT)
-            language,  # language (TEXT, 'LA')
-            publicationtype,  # publicationtype (TEXT, 'PT')
-            fulljournal,  # fulljournal (TEXT, 'JT')
-            issn,  # ISSN (TEXT, 'IS')
-            si,  # SI (TEXT, 'SI')
-            gr,  # GR (TEXT, 'GR')
-            cin,  # CIN (TEXT, 'CIN')
-            retrievedate,  # retrievedate (TEXT, YYYY-MM-DD)
-            provider,  # provider (TEXT, 'OWN')
-        )
-        articles_rows.append(article_row)
-
-        # Author / CN rows (for author table), preserving MEDLINE order
-        authors = parse_authors_from_segment(segment)
-
-        # If there are no authors at all (no CN, no FAU/AU), nothing to add
-        for idx, author in enumerate(authors, start=1):
-            author_type = author.get("type")
-            full_name = empty_to_none(author.get("full_name"))
-            short_name = empty_to_none(author.get("short_name"))
-            authors_rows.append(
-                (
-                    accession,  # accession (TEXT) as foreign key to main table
-                    idx,  # author_order (INTEGER, 1-based)
-                    author_type,  # author_type (TEXT: 'PERSON' or 'CORPORATE')
-                    full_name,  # full_name (TEXT or NULL)
-                    short_name,  # short_name (TEXT or NULL)
+def load_impact_factor_dict() -> Dict[str, Tuple[str, ...]]:
+    impactfactordict: Dict[str, Tuple[str, ...]] = {}
+    with open(journal_combined_path, "r", encoding="utf8") as file:
+        lines = file.readlines()
+        if not lines:
+            return impactfactordict
+        tsv_header = [h.strip() for h in lines[0].rstrip("\n").split("\t")]
+        hidx = {name: i for i, name in enumerate(tsv_header)}
+        for line in lines[1:]:
+            parts = line.rstrip("\n").split("\t")
+            if "abb" not in hidx or (
+                "IF_2022" not in hidx
+                and "q_2022" not in hidx
+                and "IF_2023" not in hidx
+                and "q_2023" not in hidx
+                and "IF_2024" not in hidx
+                and "q_2024" not in hidx
+                and "IF_2025" not in hidx
+                and "q_2025" not in hidx
+            ):
+                continue
+            max_idx = max(
+                hidx.get("abb", -1),
+                hidx.get("IF_2022", -1),
+                hidx.get("q_2022", -1),
+                hidx.get("IF_2023", -1),
+                hidx.get("q_2023", -1),
+                hidx.get("IF_2024", -1),
+                hidx.get("q_2024", -1),
+                hidx.get("IF_2025", -1),
+                hidx.get("q_2025", -1),
+            )
+            if len(parts) <= max_idx:
+                continue
+            abb = parts[hidx["abb"]].strip()
+            if not abb:
+                continue
+            IF2022 = parts[hidx["IF_2022"]].strip() if "IF_2022" in hidx else ""
+            quartile2022 = parts[hidx["q_2022"]].strip() if "q_2022" in hidx else ""
+            IF2023 = parts[hidx["IF_2023"]].strip() if "IF_2023" in hidx else ""
+            quartile2023 = parts[hidx["q_2023"]].strip() if "q_2023" in hidx else ""
+            IF2024 = parts[hidx["IF_2024"]].strip() if "IF_2024" in hidx else ""
+            quartile2024 = parts[hidx["q_2024"]].strip() if "q_2024" in hidx else ""
+            IF2025 = parts[hidx["IF_2025"]].strip() if "IF_2025" in hidx else ""
+            quartile2025 = parts[hidx["q_2025"]].strip() if "q_2025" in hidx else ""
+            if (
+                IF2022
+                or quartile2022
+                or IF2023
+                or quartile2023
+                or IF2024
+                or quartile2024
+                or IF2025
+                or quartile2025
+            ):
+                impactfactordict[abb] = (
+                    IF2022,
+                    quartile2022,
+                    IF2023,
+                    quartile2023,
+                    IF2024,
+                    quartile2024,
+                    IF2025,
+                    quartile2025,
                 )
+    return impactfactordict
+
+
+def _needs_impact_factors(header2: Dict[str, int]) -> bool:
+    for year in ("2022", "2023", "2024", "2025"):
+        if (
+            header2.get(f"if{year}", -1) >= 0
+            or header2.get(f"cite{year}", -1) >= 0
+            or header2.get(f"q{year}", -1) >= 0
+        ):
+            return True
+    return False
+
+
+def _format_worksheet_cell(key: str, value: Any) -> Any:
+    if key.startswith("if") or key.startswith("q"):
+        return _journal_if_empty(value)
+    if key == "pmid":
+        return value
+    return _sql_if_empty(value)
+
+
+def build_worksheet_row_values(
+    pmid: str,
+    metadata: MetadataDict,
+    header2: Dict[str, int],
+    impactfactordict: Dict[str, Tuple[str, ...]],
+) -> Dict[str, Any]:
+    """Compute internal field values for one PMID row (formatted for worksheet cells)."""
+    article_dict = metadata[pmid].get("article", {}) or {}
+
+    journal = article_dict.get("journal", "")
+    title = article_dict.get("title", "")
+    source = article_dict.get("source", "") or ""
+    firstauthorlastnameetal = article_dict.get("firstauthorlastnameetal", "")
+    cite = (
+        firstauthorlastnameetal.rstrip(".")
+        + ". "
+        + title
+        + " "
+        + source.rstrip()
+        + " PMID: "
+        + pmid
+        + "."
+    )
+    authors_list = metadata[pmid].get("authors", []) or []
+    authors_text = ", ".join(
+        a.get("short_name") or a.get("full_name") or ""
+        for a in authors_list
+        if (a.get("short_name") or a.get("full_name"))
+    )
+
+    IF2022 = IF2023 = IF2024 = IF2025 = ""
+    Q2022 = Q2023 = Q2024 = Q2025 = ""
+    cite2022 = cite2023 = cite2024 = cite2025 = ""
+    need_any = _needs_impact_factors(header2)
+    if need_any:
+        jkey = (journal or "").upper().strip().rstrip(".")
+        IF2022, Q2022, IF2023, Q2023, IF2024, Q2024, IF2025, Q2025 = impactfactordict.get(
+            jkey, ("", "", "", "", "", "", "", "")
+        )
+
+        if header2.get("cite2022", -1) >= 0:
+            if IF2022:
+                pattern = re.escape(journal)
+                replacement = r"\1 (IF: " + IF2022 + ")"
+                source2022 = re.sub(f"({pattern})", replacement, source, count=1)
+            else:
+                source2022 = source
+            cite2022 = (
+                firstauthorlastnameetal.rstrip(".")
+                + ". "
+                + title
+                + " "
+                + source2022.rstrip()
+                + " PMID: "
+                + pmid
+                + "."
             )
 
-    if not articles_rows and not authors_rows:
-        return {}
+        if header2.get("cite2023", -1) >= 0:
+            if IF2023:
+                pattern = re.escape(journal)
+                replacement = r"\1 (IF: " + IF2023 + ")"
+                source2023 = re.sub(f"({pattern})", replacement, source, count=1)
+            else:
+                source2023 = source
+            cite2023 = (
+                firstauthorlastnameetal.rstrip(".")
+                + ". "
+                + title
+                + " "
+                + source2023.rstrip()
+                + " PMID: "
+                + pmid
+                + "."
+            )
 
-    store = MetadataStore(metadata_path)
-    try:
-        store.upsert_metadata(articles_rows, authors_rows)
-        accessions = [row[0] for row in articles_rows if row[0]]
-        raw = store.get_metadata(accessions)
-        return enrich_metadata(raw)
-    finally:
-        store.close()
+        if header2.get("cite2024", -1) >= 0:
+            if IF2024:
+                pattern = re.escape(journal)
+                replacement = r"\1 (IF: " + IF2024 + ")"
+                source2024 = re.sub(f"({pattern})", replacement, source, count=1)
+            else:
+                source2024 = source
+            cite2024 = (
+                firstauthorlastnameetal.rstrip(".")
+                + ". "
+                + title
+                + " "
+                + source2024.rstrip()
+                + " PMID: "
+                + pmid
+                + "."
+            )
+
+        if header2.get("cite2025", -1) >= 0:
+            if IF2025:
+                pattern = re.escape(journal)
+                replacement = r"\1 (IF: " + IF2025 + ")"
+                source2025 = re.sub(f"({pattern})", replacement, source, count=1)
+            else:
+                source2025 = source
+            cite2025 = (
+                firstauthorlastnameetal.rstrip(".")
+                + ". "
+                + title
+                + " "
+                + source2025.rstrip()
+                + " PMID: "
+                + pmid
+                + "."
+            )
+
+    raw: Dict[str, Any] = {
+        "pmid": pmid,
+        "doi": article_dict.get("doi", ""),
+        "gr": (article_dict.get("gr", "") or "").replace("|", "; "),
+        "si": (article_dict.get("si", "") or "").replace("|", "; "),
+        "au2": authors_text,
+        "au": authors_text,
+        "fa": firstauthorlastnameetal,
+        "ti": title,
+        "ab": article_dict.get("abstract", ""),
+        "jo": article_dict.get("journal", ""),
+        "yr": article_dict.get("year", ""),
+        "fayr": article_dict.get("authoryear", ""),
+        "cite": cite,
+        "if2022": IF2022,
+        "cite2022": cite2022,
+        "q2022": Q2022,
+        "if2023": IF2023,
+        "cite2023": cite2023,
+        "q2023": Q2023,
+        "if2024": IF2024,
+        "cite2024": cite2024,
+        "q2024": Q2024,
+        "if2025": IF2025,
+        "cite2025": cite2025,
+        "q2025": Q2025,
+    }
+
+    return {key: _format_worksheet_cell(key, raw.get(key, "")) for key in header2}
+
+
+def iter_worksheet_export_rows(
+    pmids: List[str],
+    metadata: MetadataDict,
+    column_names: List[str],
+) -> Tuple[List[str], List[List[str]]]:
+    """Build header and data rows for worksheet export (Excel TSV, etc.)."""
+    header2 = build_worksheet_header_map(column_names)
+    need_any = _needs_impact_factors(header2)
+    impactfactordict = load_impact_factor_dict() if need_any else {}
+
+    data_rows: List[List[str]] = []
+    for pmid in pmids:
+        if pmid not in metadata:
+            row_values = {"pmid": pmid}
+        else:
+            row_values = build_worksheet_row_values(pmid, metadata, header2, impactfactordict)
+
+        cells: List[str] = []
+        for col_name in column_names:
+            key = WORKSHEET_COLUMN_HEADER.get(str(col_name).lower())
+            if key is None:
+                cells.append("")
+            else:
+                val = row_values.get(key, "")
+                cells.append("" if val is None else str(val))
+        data_rows.append(cells)
+
+    return column_names, data_rows
+
+
+def fill_worksheet_rows(
+    ws: xw.Sheet,
+    metadata: MetadataDict,
+    header2: Dict[str, int],
+    rows: List[Tuple[int, str]],
+) -> Tuple[List[str], List[str]]:
+    """Fill worksheet data rows. Each item in ``rows`` is (0-based row index, PMID)."""
+    identified_pmids: List[str] = []
+    unidentified_pmids: List[str] = []
+    need_any = _needs_impact_factors(header2)
+    impactfactordict = load_impact_factor_dict() if need_any else {}
+
+    for row_i, pmidstring in rows:
+        if pmidstring not in metadata:
+            unidentified_pmids.append(pmidstring)
+            if header2.get("pmid", -1) >= 0:
+                ws[row_i, header2["pmid"]].value = pmidstring
+            continue
+
+        identified_pmids.append(pmidstring)
+        row_values = build_worksheet_row_values(
+            pmidstring, metadata, header2, impactfactordict
+        )
+        for key, col_idx in header2.items():
+            if key in row_values:
+                ws[row_i, col_idx].value = row_values[key]
+
+    return identified_pmids, unidentified_pmids
 
 
 def input_pubmed_data() -> Optional[str]:
-    # settings
-    # header {column name : requested varaible}. column name all lower case
-    header = {
-        "ref": "pmid",
-        "doi": "doi",
-        "funding": "gr",
-        "grants": "gr",
-        "identifier": "si",
-        "secondaryid": "si",
-        "firstauthor": "fa",
-        "author": "au",
-        "year": "yr",
-        "authoryear": "fayr",
-        "journal": "jo",
-        "title": "ti",
-        "abstract": "ab",
-        "citation": "cite",
-        "output2": "ou2",
-        "authors": "au2",
-        "if2022": "if2022",
-        "citation2022": "cite2022",
-        "q2022": "q2022",
-        "if2023": "if2023",
-        "citation2023": "cite2023",
-        "q2023": "q2023",
-        "if2024": "if2024",
-        "citation2024": "cite2024",
-        "q2024": "q2024",
-    }
-
-    header2 = {}
+    header2: Dict[str, int] = {}
     try:
         app = xw.apps.active
         wb = xw.books.active
@@ -513,222 +796,48 @@ def input_pubmed_data() -> Optional[str]:
     extended_selection.select()
     rng = wb.app.selection
 
-    def NAifempty(value):
-        if value == "" or value is None:
-            return "NA"
-        else:
-            return value
-
     # identify existent headers
     for i in list(rng[0, :]):
         if ws[0, i.column - 1].value is None:
             continue
-        if ws[0, i.column - 1].value.lower() in header:
-            header2[header.get(ws[0, i.column - 1].value.lower())] = i.column - 1
+        if ws[0, i.column - 1].value.lower() in WORKSHEET_COLUMN_HEADER:
+            header2[WORKSHEET_COLUMN_HEADER.get(ws[0, i.column - 1].value.lower())] = i.column - 1
 
     rng_col_range = range(rng[:, 0].row - 1, rng[:, 0].row - 1 + len(rng[:, 0]))
-    requested_ref_count = sum(1 for number in rng_col_range if number != 0)  # length of rng_col_range but minus 1 if contain 0.
+    requested_ref_count = sum(1 for number in rng_col_range if number != 0)
 
-    impactfactordict = {}
-
-    need_2022 = header2.get("if2022", -1) >= 0 or header2.get("cite2022", -1) >= 0 or header2.get("q2022", -1) >= 0
-    need_2023 = header2.get("if2023", -1) >= 0 or header2.get("cite2023", -1) >= 0 or header2.get("q2023", -1) >= 0
-    need_2024 = header2.get("if2024", -1) >= 0 or header2.get("cite2024", -1) >= 0 or header2.get("q2024", -1) >= 0
-    need_any = need_2022 or need_2023 or need_2024
-
-    if need_any:
-        IF_COMBINED_PATH = os.path.join(data_dir, "journal_combined_2.txt")
-        print("load impactfactor from combined dataset")
-        with open(IF_COMBINED_PATH, "r", encoding="utf8") as file:
-            lines = file.readlines()
-            if not lines:
-                pass  # no data
-            else:
-                tsv_header = [h.strip() for h in lines[0].rstrip("\n").split("\t")]
-                hidx = {name: i for i, name in enumerate(tsv_header)}
-                for line in lines[1:]:  # Skip the header line
-                    parts = line.rstrip("\n").split("\t")
-                    # ensure required columns exist
-                    if "abb" not in hidx or (
-                        "IF_2022" not in hidx
-                        and "q_2022" not in hidx
-                        and "IF_2023" not in hidx
-                        and "q_2023" not in hidx
-                        and "IF_2024" not in hidx
-                        and "q_2024" not in hidx
-                    ):
-                        continue
-                    # ensure row long enough to access indexes we need
-                    max_idx = max(
-                        hidx.get("abb", -1),
-                        hidx.get("IF_2022", -1),
-                        hidx.get("q_2022", -1),
-                        hidx.get("IF_2023", -1),
-                        hidx.get("q_2023", -1),
-                        hidx.get("IF_2024", -1),
-                        hidx.get("q_2024", -1),
-                    )
-                    if len(parts) <= max_idx:
-                        continue
-                    abb = parts[hidx["abb"]].strip()
-                    if not abb:
-                        continue
-                    IF2022 = parts[hidx["IF_2022"]].strip() if "IF_2022" in hidx else ""
-                    quartile2022 = parts[hidx["q_2022"]].strip() if "q_2022" in hidx else ""
-                    IF2023 = parts[hidx["IF_2023"]].strip() if "IF_2023" in hidx else ""
-                    quartile2023 = parts[hidx["q_2023"]].strip() if "q_2023" in hidx else ""
-                    IF2024 = parts[hidx["IF_2024"]].strip() if "IF_2024" in hidx else ""
-                    quartile2024 = parts[hidx["q_2024"]].strip() if "q_2024" in hidx else ""
-                    if IF2022 or quartile2022 or IF2023 or quartile2023 or IF2024 or quartile2024:
-                        impactfactordict[abb] = (IF2022, quartile2022, IF2023, quartile2023, IF2024, quartile2024)
-
-    PMID_list = []
-    identifiedPMID_list = []
-    unidentifiedPMID_list = []
-    nonPMID_list = []
+    PMID_list: List[str] = []
+    nonPMID_list: List[Any] = []
 
     print(header2)
-    # Get all PMIDs possible by i's and make them to a list
     PMIDs = [ws[i, header2.get("pmid")].value for i in rng_col_range]
 
     for PMID in PMIDs:
-        if isinstance(PMID, (int, float)) and PMID > 0 and PMID.is_integer():
-            PMIDstring = str(int(PMID))
-            PMID_list.append(str(int(PMIDstring)))
-        elif isinstance(PMID, str) and PMID.replace(".", "", 1).isdigit() and float(PMID).is_integer() and float(PMID) > 0:
-            PMIDstring = str(int(float(PMID)))
-            PMID_list.append(str(int(PMIDstring)))
+        pmidstring = parse_pmid_cell_value(PMID)
+        if pmidstring:
+            PMID_list.append(pmidstring)
         else:
             nonPMID_list.append(PMID)
 
     metadata = obtain_pubmed_data(PMID_list)
 
     if not isinstance(metadata, dict):
-        return
+        return None
 
-    # input values
+    rows_to_fill: List[Tuple[int, str]] = []
     for i in rng_col_range:
-
         if i == 0:
             continue
-
-        PMID = ws[i, header2.get("pmid")].value
-
-        # Normalize PMID to a positive integer string
-        PMIDstring = None
-        if isinstance(PMID, int) and PMID > 0:
-            PMIDstring = str(PMID)
-
-        elif isinstance(PMID, float) and PMID > 0 and PMID.is_integer():
-            PMIDstring = str(int(PMID))
-
-        elif isinstance(PMID, str):
-            s = PMID.strip()
-            if s.replace(".", "", 1).isdigit():
-                f = float(s)
-                if f > 0 and f.is_integer():
-                    PMIDstring = str(int(f))
-
-        if not PMIDstring:
+        pmid_col = header2.get("pmid")
+        if pmid_col is None:
             continue
+        pmidstring = parse_pmid_cell_value(ws[i, pmid_col].value)
+        if pmidstring:
+            rows_to_fill.append((i, pmidstring))
 
-        # Now PMIDstring is a clean pmid string like "31452104"
-        if PMIDstring not in metadata:
-            unidentifiedPMID_list.append(PMIDstring)
-            continue
-
-        identifiedPMID_list.append(PMIDstring)
-
-        article_dict = metadata[PMIDstring].get("article", {}) or {}
-
-        journal = article_dict.get("journal", "")
-        title = article_dict.get("title", "")
-        source = article_dict.get("source", "") or ""
-        firstauthorlastnameetal = article_dict.get("firstauthorlastnameetal", "")
-        cite = firstauthorlastnameetal.rstrip(".") + ". " + title + " " + source.rstrip() + " PMID: " + PMIDstring + "."
-        authors_list = metadata[PMIDstring].get("authors", []) or []
-        authors_text = ", ".join(
-            a.get("short_name") or a.get("full_name") or ""
-            for a in authors_list
-            if (a.get("short_name") or a.get("full_name"))
-        )
-
-        if need_any:
-            jkey = (journal or "").upper().strip().rstrip(".")
-            IF2022, Q2022, IF2023, Q2023, IF2024, Q2024 = impactfactordict.get(jkey, ("", "", "", "", "", ""))
-
-            if header2.get("cite2022", -1) >= 0:
-                if IF2022:
-                    pattern = re.escape(journal)
-                    replacement = r"\1 (IF: " + IF2022 + ")"
-                    source2022 = re.sub(f"({pattern})", replacement, source, count=1)
-                else:
-                    source2022 = source
-                cite2022 = firstauthorlastnameetal.rstrip(".") + ". " + title + " " + source2022.rstrip() + " PMID: " + PMIDstring + "."
-
-            if header2.get("cite2023", -1) >= 0:
-                if IF2023:
-                    pattern = re.escape(journal)
-                    replacement = r"\1 (IF: " + IF2023 + ")"
-                    source2023 = re.sub(f"({pattern})", replacement, source, count=1)
-                else:
-                    source2023 = source
-                cite2023 = firstauthorlastnameetal.rstrip(".") + ". " + title + " " + source2023.rstrip() + " PMID: " + PMIDstring + "."
-
-            if header2.get("cite2024", -1) >= 0:
-                if IF2024:
-                    pattern = re.escape(journal)
-                    replacement = r"\1 (IF: " + IF2024 + ")"
-                    source2024 = re.sub(f"({pattern})", replacement, source, count=1)
-                else:
-                    source2024 = source
-                cite2024 = firstauthorlastnameetal.rstrip(".") + ". " + title + " " + source2024.rstrip() + " PMID: " + PMIDstring + "."
-
-        if header2.get("doi", -1) >= 0:
-            ws[i, header2.get("doi")].value = article_dict.get("doi", "")
-        if header2.get("gr", -1) >= 0:
-            ws[i, header2.get("gr")].value = (article_dict.get("gr", "") or "").replace("|", "; ")
-        if header2.get("si", -1) >= 0:
-            ws[i, header2.get("si")].value = (article_dict.get("si", "") or "").replace("|", "; ")
-        if header2.get("au2", -1) >= 0:
-            ws[i, header2.get("au2")].value = NAifempty(authors_text)
-        if header2.get("au", -1) >= 0:
-            ws[i, header2.get("au")].value = NAifempty(authors_text)
-        if header2.get("fa", -1) >= 0:
-            ws[i, header2.get("fa")].value = NAifempty(firstauthorlastnameetal)
-        if header2.get("ti", -1) >= 0:
-            ws[i, header2.get("ti")].value = NAifempty(title)
-        if header2.get("ab", -1) >= 0:
-            ws[i, header2.get("ab")].value = article_dict.get("abstract", "")
-        if header2.get("jo", -1) >= 0:
-            ws[i, header2.get("jo")].value = article_dict.get("journal", "")
-        if header2.get("yr", -1) >= 0:
-            ws[i, header2.get("yr")].value = article_dict.get("year", "")
-        if header2.get("fayr", -1) >= 0:
-            ws[i, header2.get("fayr")].value = article_dict.get("authoryear", "")
-        if header2.get("cite", -1) >= 0:
-            ws[i, header2.get("cite")].value = NAifempty(cite)
-        if header2.get("if2022", -1) >= 0:
-            ws[i, header2.get("if2022")].value = NAifempty(IF2022)
-        if header2.get("cite2022", -1) >= 0:
-            ws[i, header2.get("cite2022")].value = NAifempty(cite2022)
-        if header2.get("q2022", -1) >= 0:
-            ws[i, header2.get("q2022")].value = NAifempty(Q2022)
-        if header2.get("if2023", -1) >= 0:
-            ws[i, header2.get("if2023")].value = NAifempty(IF2023)
-        if header2.get("cite2023", -1) >= 0:
-            ws[i, header2.get("cite2023")].value = NAifempty(cite2023)
-        if header2.get("q2023", -1) >= 0:
-            ws[i, header2.get("q2023")].value = NAifempty(Q2023)
-        if header2.get("if2024", -1) >= 0:
-            ws[i, header2.get("if2024")].value = NAifempty(IF2024)
-        if header2.get("cite2024", -1) >= 0:
-            ws[i, header2.get("cite2024")].value = NAifempty(cite2024)
-        if header2.get("q2024", -1) >= 0:
-            ws[i, header2.get("q2024")].value = NAifempty(Q2024)
-
-    # # Enable screen updating
-    # app.api.ScreenUpdating = True
+    identifiedPMID_list, unidentifiedPMID_list = fill_worksheet_rows(
+        ws, metadata, header2, rows_to_fill
+    )
 
     if True:
         print("Number of requested references: " + str(requested_ref_count))

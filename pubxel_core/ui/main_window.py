@@ -7,6 +7,7 @@ import os
 import platform
 import re
 import shutil
+import tempfile
 import threading
 import webbrowser
 
@@ -38,11 +39,11 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from data.version import __version__
 from pubxel_core import runtime as rt
 from pubxel_core.clipboard import message_for_action, read_clipboard
 from pubxel_core.excel_ops import check_file_exist, copy_list, files_name_to_path, process_ids
-from pubxel_core.pubmed import input_pubmed_data
+from pubxel_core.nbib import load_nbib_file
+from pubxel_core.pubmed import import_nbib_to_metadata, input_pubmed_data
 from pubxel_core.pubmed import obtain_pubmed_data
 from pubxel_core.recent_worksheets import (
     format_recent_menu_label,
@@ -52,14 +53,37 @@ from pubxel_core.recent_worksheets import (
     set_recent_menu_rebuild_callback,
 )
 from pubxel_core.settings import save_settings, save_settings_key
-from pubxel_core.ui.dialogs_extra import PopupInstructions, PopupWidgettest, RunningFunctionDialog
-from pubxel_core.ui.helpers import dialog_onebutton, graceful_shutdown, open_directory, try_open_directory
+from pubxel_core.worksheet_builder import create_filled_worksheet, create_worksheet as create_pubsheet_worksheet
+from pubxel_core.worksheet_export import write_worksheet_tsv
+from pubxel_core.ui.dialogs_extra import (
+    NbibImportChoice,
+    NbibImportDialog,
+    PopupInstructions,
+    PopupWidgettest,
+    RunningFunctionDialog,
+)
+from pubxel_core.ui.helpers import (
+    default_tsv_save_name,
+    default_worksheet_save_directory,
+    default_worksheet_save_name,
+    dialog_onebutton,
+    graceful_shutdown,
+    open_directory,
+    show_file_saved_dialog,
+    show_worksheet_saved_dialog,
+    try_open_directory,
+)
 from pubxel_core.ui.preferences import window_preferences
 from pubxel_core.ui.tray import SystemTrayIcon
 from pubxel_core.ui.widgets import PopupMessageFade, window_about, window_inspect, window_worksheetColumns
 from pubxel_core.ui.workers import excelWorker
 
+_OPEN_FILE_EXTENSIONS = (".xlsx", ".nbib")
+
+
 class main_window(QMainWindow):
+    _nbib_export_built = pyqtSignal(str, str)
+    _nbib_export_failed = pyqtSignal(str)
 
     def __init__(self):
 # global rt.settings -> rt.settings
@@ -143,6 +167,9 @@ class main_window(QMainWindow):
         self.findChild(QAction, 'actionOpen_Library_Folder').triggered.connect(lambda: try_open_directory(rt.mainlibdir))
         self.findChild(QAction, 'actionOpen_Output_Folder').triggered.connect(lambda: try_open_directory(rt.outdir))
         self.findChild(QAction, 'actionNew_Excel_Template').triggered.connect(self.save_pubsheet)
+        open_action = self.findChild(QAction, 'actionOpen')
+        if open_action is not None:
+            open_action.triggered.connect(self.open_file_dialog)
         self.findChild(QAction, 'actionPreferences').triggered.connect(self.open_preferences)
         self.findChild(QAction, 'actionAbout').triggered.connect(self.open_about_window)
         self.findChild(QAction, 'actionWorksheetColumns').triggered.connect(self.open_worksheetColumns_window)
@@ -157,6 +184,11 @@ class main_window(QMainWindow):
 
         self.tray_icon = SystemTrayIcon(self)
         self.tray_icon.show()
+
+        self._nbib_dialog = None
+        self._nbib_export_built.connect(self._on_nbib_export_built)
+        self._nbib_export_failed.connect(self._on_nbib_export_failed)
+        self._install_file_drop_targets()
 
     def button3_clicked(self):
         def on_press(key):
@@ -335,18 +367,21 @@ class main_window(QMainWindow):
             file_dialog.setDefaultSuffix("xlsx")
             file_dialog.setNameFilters(["Excel Files (*.xlsx)", "All Files (*)"])
 
+            save_dir = os.path.expanduser("~/Documents")
             try:
-                documents_path = os.path.expanduser("~/Documents")
-                file_dialog.setDirectory(documents_path)
+                if not os.path.isdir(save_dir):
+                    save_dir = os.path.expanduser("~")
+                file_dialog.setDirectory(save_dir)
             except Exception as e:
                 print(f"Failed to set initial directory: {e}")
+                save_dir = os.path.expanduser("~")
 
-            file_dialog.selectFile("Pub-Xel Worksheet.xlsx")
+            file_dialog.selectFile(default_worksheet_save_name(save_dir))
 
             if file_dialog.exec() == QFileDialog.DialogCode.Accepted:
                 file_path = file_dialog.selectedFiles()[0]
                 try:
-                    shutil.copyfile(rt.pubsheet_path, file_path)
+                    create_pubsheet_worksheet(file_path, settings=rt.settings)
                     self.save_success_dialog(file_path)
                 except Exception as e:
                     QMessageBox.critical(self, "Error", f"Failed to save file: {str(e)}")
@@ -358,32 +393,198 @@ class main_window(QMainWindow):
         raise Exception("Crash")
     
     def save_success_dialog(self, file_path):
-# global rt.settings -> rt.settings
-        msg_box = QMessageBox(self)
-        msg_box.setIcon(QMessageBox.Icon.Information)
-        msg_box.setText("Worksheet saved.")
-        msg_box.setWindowTitle("Success")
+        show_worksheet_saved_dialog(self, file_path)
 
-        open_button = QPushButton("Open Worksheet")
-        msg_box.addButton(open_button, QMessageBox.ButtonRole.ActionRole)
+    def _local_paths_from_mime(self, mime) -> list[str]:
+        if not mime.hasUrls():
+            return []
+        paths: list[str] = []
+        for url in mime.urls():
+            if url.isLocalFile():
+                paths.append(url.toLocalFile())
+        return paths
 
-        if rt.settings["worksheet_count"] > 0:
-            open_folder_button = QPushButton("Open Folder")
-            msg_box.addButton(open_folder_button, QMessageBox.ButtonRole.ActionRole)
-            msg_box.addButton(QMessageBox.StandardButton.Ok)
-        
-        msg_box.exec()
+    def _first_openable_path(self, paths: list[str]) -> str | None:
+        for path in paths:
+            if os.path.isfile(path) and os.path.splitext(path)[1].lower() in _OPEN_FILE_EXTENSIONS:
+                return path
+        return None
 
-        if msg_box.clickedButton() == open_button:
-            try_open_directory(file_path)
-        
-        if rt.settings["worksheet_count"] > 0:
-            if msg_box.clickedButton() == open_folder_button:
-                folder_path = os.path.dirname(file_path)
-                try_open_directory(folder_path)
+    def _first_droppable_path(self, mime) -> str | None:
+        return self._first_openable_path(self._local_paths_from_mime(mime))
 
-        rt.settings = save_settings_key(rt.settings,"worksheet_count",rt.settings['worksheet_count']+1)
-        register_recent_worksheet(file_path)
+    def _install_file_drop_targets(self) -> None:
+        self.setAcceptDrops(True)
+        for widget in [self, *self.findChildren(QWidget)]:
+            widget.installEventFilter(self)
+
+    def eventFilter(self, watched, event) -> bool:
+        if event.type() in (QEvent.Type.DragEnter, QEvent.Type.DragMove):
+            if self._first_droppable_path(event.mimeData()):
+                event.acceptProposedAction()
+                return True
+            return False
+        if event.type() == QEvent.Type.Drop:
+            file_path = self._first_droppable_path(event.mimeData())
+            if not file_path:
+                return False
+            if not rt.try_begin_action():
+                return True
+            event.acceptProposedAction()
+            self._process_open_file_path(file_path)
+            return True
+        return super().eventFilter(watched, event)
+
+    def open_file_dialog(self):
+        if not rt.try_begin_action():
+            return
+        save_dir = default_worksheet_save_directory()
+        file_path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Open File",
+            save_dir,
+            "Excel Worksheets & nbib (*.xlsx *.nbib);;"
+            "Excel Worksheets (*.xlsx);;"
+            "PubMed nbib (*.nbib);;"
+            "All Files (*)",
+        )
+        if not file_path:
+            rt.end_action()
+            return
+        self._process_open_file_path(file_path)
+
+    def _process_open_file_path(self, file_path: str) -> None:
+        """Handle Open or nbib drag-drop. Caller must hold rt action lock."""
+        ext = os.path.splitext(file_path)[1].lower()
+        if ext == ".xlsx":
+            try:
+                try_open_directory(file_path)
+                register_recent_worksheet(file_path)
+            finally:
+                rt.end_action()
+            return
+
+        if ext == ".nbib":
+            self._start_nbib_import(file_path)
+            return
+
+        dialog_onebutton(self, "Unsupported file type.", "Open File")
+        rt.end_action()
+
+    def _start_nbib_import(self, file_path: str) -> None:
+        try:
+            records, pmids, count = load_nbib_file(file_path)
+        except ValueError as e:
+            dialog_onebutton(self, str(e), "Open File")
+            rt.end_action()
+            return
+
+        choice_dialog = NbibImportDialog(self, count)
+        if choice_dialog.exec() != QDialog.DialogCode.Accepted:
+            rt.end_action()
+            return
+
+        choice = choice_dialog.choice()
+        if choice == NbibImportChoice.CANCEL:
+            rt.end_action()
+            return
+
+        self.setEnabled(False)
+        self._nbib_dialog = RunningFunctionDialog(
+            parent=self,
+            message="Importing PubMed data...\nPlease wait.",
+        )
+        thread = threading.Thread(
+            target=self._nbib_import_worker,
+            args=(records, pmids, choice),
+            daemon=True,
+        )
+        thread.start()
+
+    def _close_nbib_dialog(self) -> None:
+        if self._nbib_dialog is not None:
+            try:
+                self._nbib_dialog.close()
+            except Exception:
+                pass
+            self._nbib_dialog = None
+
+    def _nbib_import_worker(
+        self,
+        records: list[str],
+        pmids: list[str],
+        choice: str,
+    ) -> None:
+        temp_path = None
+        try:
+            metadata = import_nbib_to_metadata(records)
+            suffix = ".xlsx" if choice == NbibImportChoice.EXCEL else ".tsv"
+            fd, temp_path = tempfile.mkstemp(suffix=suffix)
+            os.close(fd)
+            if choice == NbibImportChoice.EXCEL:
+                create_filled_worksheet(
+                    temp_path,
+                    pmids,
+                    metadata,
+                    settings=rt.settings,
+                )
+            else:
+                write_worksheet_tsv(temp_path, pmids, metadata, rt.settings)
+            self._nbib_export_built.emit(temp_path, choice)
+        except Exception as e:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+            self._nbib_export_failed.emit(str(e))
+
+    def _on_nbib_export_built(self, temp_path: str, choice: str) -> None:
+        self._close_nbib_dialog()
+        self.setEnabled(True)
+
+        save_dir = default_worksheet_save_directory()
+        if choice == NbibImportChoice.EXCEL:
+            file_dialog = QFileDialog(self, "Save Worksheet")
+            file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+            file_dialog.setDefaultSuffix("xlsx")
+            file_dialog.setNameFilters(["Excel Files (*.xlsx)", "All Files (*)"])
+            file_dialog.setDirectory(save_dir)
+            file_dialog.selectFile(default_worksheet_save_name(save_dir))
+        else:
+            file_dialog = QFileDialog(self, "Save TSV File")
+            file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+            file_dialog.setDefaultSuffix("tsv")
+            file_dialog.setNameFilters(["TSV Files (*.tsv)", "All Files (*)"])
+            file_dialog.setDirectory(save_dir)
+            file_dialog.selectFile(default_tsv_save_name(save_dir))
+
+        dest_path = None
+        if file_dialog.exec() == QFileDialog.DialogCode.Accepted:
+            dest_path = file_dialog.selectedFiles()[0]
+
+        try:
+            if dest_path:
+                shutil.copy2(temp_path, dest_path)
+                if choice == NbibImportChoice.EXCEL:
+                    show_worksheet_saved_dialog(self, dest_path)
+                else:
+                    show_file_saved_dialog(self, dest_path, open_label="Open File")
+        except Exception as e:
+            dialog_onebutton(self, f"Failed to save file:\n{e}", "Error")
+        finally:
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except OSError:
+                pass
+            rt.end_action()
+
+    def _on_nbib_export_failed(self, message: str) -> None:
+        self._close_nbib_dialog()
+        self.setEnabled(True)
+        rt.end_action()
+        dialog_onebutton(self, f"Failed to import nbib file:\n{message}", "Error")
 
     def run_check_file_exist2(self):
         if not rt.try_begin_action():
@@ -710,7 +911,7 @@ class main_window(QMainWindow):
             if len(selected_cell_value) == 0:
                 dialog_onebutton(self, "No ID(s) selected.", "Error")
                 return
-            if len(selected_cell_value) >= 200:
+            if len(selected_cell_value) > 200:
                 dialog_onebutton(self, "Please select 200 or fewer ID(s).", "Error")
                 return
             print("opening inspect window...")

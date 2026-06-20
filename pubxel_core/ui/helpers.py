@@ -8,9 +8,11 @@ import subprocess
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtWidgets import QMessageBox, QPushButton, QWidget
 
 from pubxel_core import runtime as rt
+from pubxel_core.recent_worksheets import register_recent_worksheet
+from pubxel_core.settings import save_settings_key
 
 
 def _get_sep(p):
@@ -73,6 +75,41 @@ def graceful_shutdown():
         pass
 
 
+WORKSHEET_DEFAULT_BASENAME = "Pub-Xel Worksheet"
+TSV_DEFAULT_BASENAME = "Pub-Xel data"
+
+
+def default_worksheet_save_directory() -> str:
+    """Return the default save/browse directory (~/Documents, fallback ~)."""
+    save_dir = os.path.expanduser("~/Documents")
+    if os.path.isdir(save_dir):
+        return save_dir
+    return os.path.expanduser("~")
+
+
+def _default_save_name(directory: str, base_name: str, suffix: str) -> str:
+    dir_path = os.path.abspath(directory)
+    first = f"{base_name}{suffix}"
+    if not os.path.exists(os.path.join(dir_path, first)):
+        return first
+    n = 2
+    while True:
+        candidate = f"{base_name} ({n}){suffix}"
+        if not os.path.exists(os.path.join(dir_path, candidate)):
+            return candidate
+        n += 1
+
+
+def default_worksheet_save_name(directory: str, base_name: str = WORKSHEET_DEFAULT_BASENAME) -> str:
+    """Return the next unused default worksheet filename in ``directory``."""
+    return _default_save_name(directory, base_name, ".xlsx")
+
+
+def default_tsv_save_name(directory: str, base_name: str = TSV_DEFAULT_BASENAME) -> str:
+    """Return the next unused default TSV filename in ``directory``."""
+    return _default_save_name(directory, base_name, ".tsv")
+
+
 def dialog_onebutton(parent, message, title="Confirmation"):
     msg_box = QMessageBox(parent)
     msg_box.setWindowTitle(title)
@@ -81,3 +118,55 @@ def dialog_onebutton(parent, message, title="Confirmation"):
     msg_box.setWindowModality(Qt.WindowModality.ApplicationModal)
     msg_box.exec()
     msg_box.setFocus(QtCore.Qt.FocusReason.PopupFocusReason)
+
+
+def show_file_saved_dialog(
+    parent: QWidget | None,
+    file_path: str,
+    *,
+    open_label: str = "Open File",
+    saved_message: str = "File saved.",
+    register_recent: bool = False,
+    increment_worksheet_count: bool = False,
+) -> None:
+    """Show a post-save dialog with optional open file/folder actions."""
+    msg_box = QMessageBox(parent)
+    msg_box.setIcon(QMessageBox.Icon.Information)
+    msg_box.setText(saved_message)
+    msg_box.setWindowTitle("Success")
+
+    open_button = QPushButton(open_label)
+    msg_box.addButton(open_button, QMessageBox.ButtonRole.ActionRole)
+
+    open_folder_button = None
+    if rt.settings.get("worksheet_count", 0) > 0:
+        open_folder_button = QPushButton("Open Folder")
+        msg_box.addButton(open_folder_button, QMessageBox.ButtonRole.ActionRole)
+        msg_box.addButton(QMessageBox.StandardButton.Ok)
+
+    msg_box.exec()
+
+    if msg_box.clickedButton() == open_button:
+        try_open_directory(file_path)
+
+    if open_folder_button is not None and msg_box.clickedButton() == open_folder_button:
+        folder_path = os.path.dirname(file_path)
+        try_open_directory(folder_path)
+
+    if increment_worksheet_count:
+        rt.settings = save_settings_key(
+            rt.settings, "worksheet_count", rt.settings.get("worksheet_count", 0) + 1
+        )
+    if register_recent:
+        register_recent_worksheet(file_path)
+
+
+def show_worksheet_saved_dialog(parent: QWidget | None, file_path: str) -> None:
+    show_file_saved_dialog(
+        parent,
+        file_path,
+        open_label="Open Worksheet",
+        saved_message="Worksheet saved.",
+        register_recent=True,
+        increment_worksheet_count=True,
+    )

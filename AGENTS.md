@@ -23,7 +23,7 @@ Biomedical reference manager integrated with **Microsoft Excel** and **PubMed**.
 | `pubxel_core/ui/tray.py` | System tray icon |
 | `pubxel_core/ui/helpers.py` | `dialog_onebutton`, open folder, shutdown helpers |
 | `pubxel_core/update.py` | Weekly update check |
-| `pubxel_core/paths.py` | **Single source of truth** for `project_dir`, `assets_dir`, `ui_dir`, `data_dir`, `appdatadir`, `settings_path`, `metadata_path`, `os_name` |
+| `pubxel_core/paths.py` | **Single source of truth** for `project_dir`, `assets_dir`, `ui_dir`, `data_dir`, `journal_combined_path`, `pubsheet_all_columns_path`, `appdatadir`, `settings_path`, `metadata_path`, `os_name` |
 | `pubxel_core/settings.py` | Load/save `settings.json` under app data dir |
 | `pubxel_core/metadata_store.py` | SQLite metadata (`MetadataStore`, `metadataStore` alias, `enrich_metadata`) |
 | `pubxel_core/ids.py` | `split_clipboard_text` + per-token `ids_from_clipboard_token` (PMID URL, path stem, numeric); legacy `string_to_list` still uses `:` delimiter |
@@ -31,7 +31,7 @@ Biomedical reference manager integrated with **Microsoft Excel** and **PubMed**.
 | `pubxel_core/pubmed.py` | `obtain_pubmed_data` (NCBI fetch → SQLite upsert → enriched `MetadataDict`); `input_pubmed_data` (Excel fill + impact factors) |
 | `pubxel_core/mainfunctions.py` | **Shim** — re-exports the above for older imports |
 | `pubxel_core/welcome.py` | First-run welcome dialog |
-| `data/` | Bundled defaults: `settingsdefault.json`, `version.py`, `journal_combined_2.txt`, Excel templates |
+| `data/` | Bundled defaults: `settingsdefault.json`, `version.py`, `journal_combined_2025.txt`, Excel templates |
 | `ui/` | Qt Designer `.ui` files |
 | `assets/` | Icons, splash, welcome images |
 
@@ -43,7 +43,7 @@ Biomedical reference manager integrated with **Microsoft Excel** and **PubMed**.
 | macOS | `~/Library/Application Support/pubxel` |
 | Linux (unsupported in UI) | `~/.pubxel` |
 
-Contains `settings.json`, `pubsheet.xlsx`, `metadata/metadata_article.sqlite`, lock file, update-check timestamp.
+Contains `settings.json`, `pubsheet.xlsx` (generated on first run from column preferences), `metadata/metadata_article.sqlite`, lock file, update-check timestamp.
 
 ## Run locally
 
@@ -98,7 +98,7 @@ python scripts/smoke_imports.py
 ## PubMed metadata flow
 
 - **`obtain_pubmed_data(pmids)`** — NCBI MEDLINE fetch → `MetadataStore.upsert_metadata` → `get_metadata` → `enrich_metadata` → returns `MetadataDict`
-- **`input_pubmed_data()`** — reads Excel selection, calls `obtain_pubmed_data`, writes cells (plus journal impact factors from `data/journal_combined_2.txt`)
+- **`input_pubmed_data()`** — reads Excel selection, calls `obtain_pubmed_data`, writes cells (plus journal impact factors from `data/journal_combined_2025.txt`)
 
 ## Types and naming
 

@@ -7,6 +7,7 @@ import os
 import platform
 import re
 import shutil
+import tempfile
 import threading
 import webbrowser
 
@@ -44,9 +45,18 @@ from pubxel_core import runtime as rt
 from pubxel_core.excel_ops import check_file_exist, copy_list, files_name_to_path, process_ids
 from pubxel_core.clipboard import message_for_action, read_clipboard
 from pubxel_core.ids import list_to_string
-from pubxel_core.pubmed import input_pubmed_data, normalize_pmid, resolve_metadata_for_pmids
+from pubxel_core.pubmed import input_pubmed_data, normalize_pmid, normalize_pmid_list, resolve_metadata_for_pmids
 from pubxel_core.settings import save_settings, save_settings_key
-from pubxel_core.ui.helpers import dialog_onebutton, dirname, open_directory, try_open_directory
+from pubxel_core.ui.dialogs_extra import RunningFunctionDialog
+from pubxel_core.ui.helpers import (
+    default_worksheet_save_name,
+    dialog_onebutton,
+    dirname,
+    open_directory,
+    show_worksheet_saved_dialog,
+    try_open_directory,
+)
+from pubxel_core.worksheet_builder import create_filled_worksheet
 
 class PopupMessageFade(QLabel):
     def __init__(self, parent=None):
@@ -118,20 +128,20 @@ class window_worksheetColumns(QDialog):
         self.setWindowTitle('View Worksheet Columns')
 
         fields = [
-            "IF2024", 
-            "Q2024", 
-            "abstract", 
+            "ref",
+            "doi",
+            "authoryear",
             "authors",
-            "authoryear", 
+            "year",
+            "journal",
+            "title",
+            "abstract",
             "citation",
-            "citation2024", 
-            "doi", 
-            "funding",
+            "citation2025",
+            "IF2025",
+            "Q2025",
             "identifier",
-            "journal", 
-            "ref", 
-            "title", 
-            "year"
+            "funding",
         ]
 
         for name in fields:
@@ -157,6 +167,9 @@ class window_worksheetColumns(QDialog):
 class window_inspect(QWidget):
     _pubmed_metadata_ready = pyqtSignal(object, list)
     _pubmed_connection_status = pyqtSignal(str, str)
+    _worksheet_built = pyqtSignal(str)
+    _worksheet_build_failed = pyqtSignal(str)
+    _pubmed_load_finished = pyqtSignal()
 
     def __init__(self, parent, data=None, clipboard_ids=None):
         # The action_in_progress flag is acquired by the caller
@@ -174,6 +187,13 @@ class window_inspect(QWidget):
         self.pubmeddata = None
         self._pubmed_metadata_ready.connect(self._on_pubmed_metadata_ready)
         self._pubmed_connection_status.connect(self._on_pubmed_connection_status)
+        self._worksheet_built.connect(self._on_worksheet_built)
+        self._worksheet_build_failed.connect(self._on_worksheet_build_failed)
+        self._pubmed_load_finished.connect(self._on_pubmed_metadata_load_done)
+        self._worksheet_buttons: list[QPushButton] = []
+        self._worksheet_build_in_progress = False
+        self._pubmed_load_in_progress = False
+        self._worksheet_dialog = None
         self._spinner_frames = ["|", "/", "-", "\\"]
         self._spinner_index = 0
         self._spinner_timer = QTimer(self)
@@ -310,6 +330,7 @@ class window_inspect(QWidget):
             button_searchpubmed.setText('View &PubMed')
             button_worksheetpubmed.clicked.connect(lambda: self.make_worksheet(pubmed_ids))
             button_worksheetpubmed.setText('Make &Worksheet')
+            self._worksheet_buttons.append(button_worksheetpubmed)
             shortcut_p = QShortcut(QKeySequence('p'), self)
             shortcut_p.activated.connect(lambda: self.search_pubmed(pubmed_ids))
         if pubmed_ids_without_m_files:
@@ -334,6 +355,7 @@ class window_inspect(QWidget):
                 lambda: self.make_worksheet(pubmed_ids_without_m_files)
             )
             button_worksheetpubmedna.setText('Make &Worksheet')
+            self._worksheet_buttons.append(button_worksheetpubmedna)
         if non_pubmed_valid_ids:
             label_nonpub, button_copynonpub, _, _ = self.create_elements(
                 gridLayout_summary, 2, 'label_nonpub', 'button_copynonpub'
@@ -352,6 +374,8 @@ class window_inspect(QWidget):
             )
             label_na.setText(f"Invalid ID(s): {len(invalid_ids)}")
             button_copyna.clicked.connect(lambda: self.show_copy_id_and_show_popup(invalid_ids))
+
+        self._update_worksheet_buttons_state()
         
         self.scrollLayout_main = self.findChild(QWidget, 'scrollLayout_main')
         self.scrollLayout_suppl = self.findChild(QWidget, 'scrollLayout_suppl')
@@ -420,6 +444,9 @@ class window_inspect(QWidget):
         self.scrollLayout_suppl.layout().addStretch()
 
         thread = threading.Thread(target=self.load_pubmed_data, args=(pubmed_ids,))
+        if pubmed_ids:
+            self._pubmed_load_in_progress = True
+            self._update_worksheet_buttons_state()
         thread.start()
 
         button_openall = self.findChild(QPushButton, 'button_openall')
@@ -476,6 +503,7 @@ class window_inspect(QWidget):
         """Main-thread slot: apply metadata loaded from background thread."""
         self.pubmeddata = data
         self._apply_pubmed_metadata_to_ui(pubmed_ids)
+        self._update_worksheet_buttons_state()
 
     def _on_pubmed_connection_status(self, state: str, detail: str = ""):
         if state == "loading":
@@ -486,6 +514,24 @@ class window_inspect(QWidget):
             self.set_pubmed_conn_error(detail)
         else:
             self.set_pubmed_conn_idle()
+        self._update_worksheet_buttons_state()
+
+    def _on_pubmed_metadata_load_done(self) -> None:
+        self._pubmed_load_in_progress = False
+        self._update_worksheet_buttons_state()
+
+    def _worksheet_ready(self) -> bool:
+        return bool(
+            self.pubmeddata
+            and not self._pubmed_load_in_progress
+            and self.pubmed_conn_state in ("idle", "success")
+            and not self._worksheet_build_in_progress
+        )
+
+    def _update_worksheet_buttons_state(self) -> None:
+        ready = self._worksheet_ready()
+        for button in self._worksheet_buttons:
+            button.setEnabled(ready)
 
     def _set_pubmed_conn_state(self, state: str, error: str = ""):
         if not self.pubmed_conn_enabled:
@@ -675,6 +721,8 @@ class window_inspect(QWidget):
         except Exception as e:
             print(f"Failed to load data: {e}")
             self._pubmed_connection_status.emit("error", str(e))
+        finally:
+            self._pubmed_load_finished.emit()
 
     def eventFilter(self, source, event):
         if isinstance(source, QCheckBox) or isinstance(source, QLabel):
@@ -839,13 +887,95 @@ class window_inspect(QWidget):
         self.close_inspect_window()
 
     def make_worksheet(self, pubmed_ids):
-        """Fill/export a worksheet for the given PubMed ID(s). Implementation pending."""
-        print(f"Make Worksheet: {pubmed_ids}")
-        dialog_onebutton(
-            self,
-            "Make Worksheet is not implemented yet.",
-            "Make Worksheet",
+        if not self._worksheet_ready():
+            return
+
+        pmids = normalize_pmid_list(pubmed_ids)
+        if not pmids:
+            dialog_onebutton(self, "No PubMed ID(s) to include in the worksheet.", "Make Worksheet")
+            return
+
+        self._worksheet_build_in_progress = True
+        self._update_worksheet_buttons_state()
+        self._worksheet_dialog = RunningFunctionDialog(
+            parent=self,
+            message="Creating worksheet...\nPlease wait.",
         )
+        thread = threading.Thread(
+            target=self._build_worksheet_worker,
+            args=(pmids,),
+            daemon=True,
+        )
+        thread.start()
+
+    def _build_worksheet_worker(self, pmids: list[str]) -> None:
+        temp_path = None
+        try:
+            fd, temp_path = tempfile.mkstemp(suffix=".xlsx")
+            os.close(fd)
+            create_filled_worksheet(
+                temp_path,
+                pmids,
+                self.pubmeddata or {},
+                settings=rt.settings,
+            )
+            self._worksheet_built.emit(temp_path)
+        except Exception as e:
+            if temp_path and os.path.exists(temp_path):
+                try:
+                    os.remove(temp_path)
+                except OSError:
+                    pass
+            self._worksheet_build_failed.emit(str(e))
+
+    def _close_worksheet_dialog(self) -> None:
+        if self._worksheet_dialog is not None:
+            try:
+                self._worksheet_dialog.close()
+            except Exception:
+                pass
+            self._worksheet_dialog = None
+
+    def _on_worksheet_built(self, temp_path: str) -> None:
+        self._close_worksheet_dialog()
+        self._worksheet_build_in_progress = False
+        self._update_worksheet_buttons_state()
+
+        file_dialog = QFileDialog(self, "Save Worksheet")
+        file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        file_dialog.setDefaultSuffix("xlsx")
+        file_dialog.setNameFilters(["Excel Files (*.xlsx)", "All Files (*)"])
+        save_dir = os.path.expanduser("~/Documents")
+        try:
+            if not os.path.isdir(save_dir):
+                save_dir = os.path.expanduser("~")
+            file_dialog.setDirectory(save_dir)
+        except Exception:
+            save_dir = os.path.expanduser("~")
+        file_dialog.selectFile(default_worksheet_save_name(save_dir))
+
+        dest_path = None
+        if file_dialog.exec() == QFileDialog.DialogCode.Accepted:
+            dest_path = file_dialog.selectedFiles()[0]
+
+        try:
+            if dest_path:
+                shutil.copy2(temp_path, dest_path)
+                show_worksheet_saved_dialog(self, dest_path)
+        except Exception as e:
+            dialog_onebutton(self, f"Failed to save worksheet:\n{e}", "Error")
+        finally:
+            try:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+            except OSError:
+                pass
+
+    def _on_worksheet_build_failed(self, message: str) -> None:
+        self._close_worksheet_dialog()
+        self._worksheet_build_in_progress = False
+        self._update_worksheet_buttons_state()
+        dialog_onebutton(self, f"Failed to create worksheet:\n{message}", "Error")
 
     def callback(self,result): #open files and quit new_window
         if result == []:
@@ -934,12 +1064,13 @@ class window_inspect(QWidget):
         
         def create_dated_folder(base_dir):
             today = datetime.datetime.today().strftime('%Y-%m-%d')
-            folder_name = f"{today}"
+            base_name = f"Pub-Xel Export {today}"
+            folder_name = base_name
             folder_path = os.path.join(base_dir, folder_name)
             counter = 2
 
             while os.path.exists(folder_path):
-                folder_name = f"{today} ({counter})"
+                folder_name = f"{base_name} ({counter})"
                 folder_path = os.path.join(base_dir, folder_name)
                 counter += 1
 
@@ -966,10 +1097,17 @@ class window_inspect(QWidget):
         def open_newdir():
             try_open_directory(os.path.realpath(newdir))
 
+        total = len(files)
+        exported = copied_files
+        if exported == total:
+            completion_text = f"{exported} exported successfully"
+        else:
+            completion_text = f"{exported} out of {total} files exported"
+
         def show_message_box():
             msg_box = QMessageBox()
             msg_box.setWindowTitle("Completion")
-            msg_box.setText(f"A total of {copied_files} file(s) were successfully copied in folder: {newfolder}")
+            msg_box.setText(completion_text)
             open_folder_button = msg_box.addButton("Open Folder", QMessageBox.ButtonRole.AcceptRole)
             open_folder_button.clicked.connect(lambda: open_newdir())
             msg_box.setWindowModality(QtCore.Qt.WindowModality.ApplicationModal)

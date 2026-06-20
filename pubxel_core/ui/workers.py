@@ -38,7 +38,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from data.version import __version__
 from pubxel_core import runtime as rt
 from pubxel_core.excel_ops import check_file_exist, copy_list, files_name_to_path, process_ids
 from pubxel_core.pubmed import input_pubmed_data

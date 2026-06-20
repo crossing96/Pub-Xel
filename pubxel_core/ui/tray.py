@@ -14,7 +14,7 @@ import concurrent.futures
 import xlwings as xw
 from pynput import keyboard
 from PyQt6 import QtCore, uic
-from PyQt6.QtCore import QEvent, QObject, QPropertyAnimation, QThread, QTimer, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QObject, QPropertyAnimation, QThread, QTimer, Qt, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QAction, QIcon
 from PyQt6.QtWidgets import (
     QApplication,
@@ -38,7 +38,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from data.version import __version__
 from pubxel_core import runtime as rt
 from pubxel_core.excel_ops import check_file_exist, copy_list, files_name_to_path, process_ids
 from pubxel_core.pubmed import input_pubmed_data
@@ -64,8 +63,12 @@ class SystemTrayIcon(QSystemTrayIcon):
         self.menu.addAction(self.exit_action)
         self.setContextMenu(self.menu)
 
-    def on_activated(self, reason):
-        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+    @pyqtSlot(QSystemTrayIcon.ActivationReason)
+    def on_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
+        if reason in (
+            QSystemTrayIcon.ActivationReason.Trigger,
+            QSystemTrayIcon.ActivationReason.DoubleClick,
+        ):
             self.on_restore()
 
     def on_restore(self):
