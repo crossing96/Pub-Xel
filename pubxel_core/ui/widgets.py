@@ -52,6 +52,7 @@ from pubxel_core.ui.helpers import (
     default_worksheet_save_name,
     dialog_onebutton,
     dirname,
+    format_excel_operation_error,
     open_directory,
     show_worksheet_saved_dialog,
     try_open_directory,
@@ -118,51 +119,6 @@ class window_about(QDialog):
     def close_about_window(self):
         self.close()
 
-
-
-class window_worksheetColumns(QDialog):
-    def __init__(self, parent):
-        super().__init__(parent)
-        uic.loadUi(rt.worksheetColumns_path, self)
-        self.pseudo_parent = parent
-        self.setWindowTitle('View Worksheet Columns')
-
-        fields = [
-            "ref",
-            "doi",
-            "authoryear",
-            "authors",
-            "year",
-            "journal",
-            "title",
-            "abstract",
-            "citation",
-            "citation2025",
-            "IF2025",
-            "Q2025",
-            "identifier",
-            "funding",
-        ]
-
-        for name in fields:
-            button = self.findChild(QPushButton, f'button_{name}')
-            label = self.findChild(QLabel, f'label_{name}')
-            if button and label:
-                button.clicked.connect(lambda _, l=label: copy_list(l.text()))
-
-        button_ok = self.findChild(QPushButton, 'button_ok')
-        button_ok.clicked.connect(self.close_worksheetColumns_window)
-
-        shortcut_Esc = QShortcut(QKeySequence('Esc'), self)
-        shortcut_Esc.activated.connect(self.close_worksheetColumns_window)
-
-        # Auto-close when main window is destroyed
-        QApplication.instance().aboutToQuit.connect(self.close)
-
-        self.show()
-
-    def close_worksheetColumns_window(self):
-        self.close()
 
 class window_inspect(QWidget):
     _pubmed_metadata_ready = pyqtSignal(object, list)
@@ -975,7 +931,11 @@ class window_inspect(QWidget):
         self._close_worksheet_dialog()
         self._worksheet_build_in_progress = False
         self._update_worksheet_buttons_state()
-        dialog_onebutton(self, f"Failed to create worksheet:\n{message}", "Error")
+        dialog_onebutton(
+            self,
+            f"Failed to create worksheet:\n{format_excel_operation_error(message)}",
+            "Error",
+        )
 
     def callback(self,result): #open files and quit new_window
         if result == []:

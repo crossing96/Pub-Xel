@@ -52,7 +52,7 @@ from pubxel_core.recent_worksheets import (
     remove_recent_worksheet,
     set_recent_menu_rebuild_callback,
 )
-from pubxel_core.settings import save_settings, save_settings_key
+from pubxel_core.paths import pubsheetinitial_path
 from pubxel_core.worksheet_builder import create_filled_worksheet, create_worksheet as create_pubsheet_worksheet
 from pubxel_core.worksheet_export import write_worksheet_tsv
 from pubxel_core.ui.dialogs_extra import (
@@ -67,6 +67,7 @@ from pubxel_core.ui.helpers import (
     default_worksheet_save_directory,
     default_worksheet_save_name,
     dialog_onebutton,
+    format_excel_operation_error,
     graceful_shutdown,
     open_directory,
     show_file_saved_dialog,
@@ -75,7 +76,7 @@ from pubxel_core.ui.helpers import (
 )
 from pubxel_core.ui.preferences import window_preferences
 from pubxel_core.ui.tray import SystemTrayIcon
-from pubxel_core.ui.widgets import PopupMessageFade, window_about, window_inspect, window_worksheetColumns
+from pubxel_core.ui.widgets import PopupMessageFade, window_about, window_inspect
 from pubxel_core.ui.workers import excelWorker
 
 _OPEN_FILE_EXTENSIONS = (".xlsx", ".nbib")
@@ -172,7 +173,6 @@ class main_window(QMainWindow):
             open_action.triggered.connect(self.open_file_dialog)
         self.findChild(QAction, 'actionPreferences').triggered.connect(self.open_preferences)
         self.findChild(QAction, 'actionAbout').triggered.connect(self.open_about_window)
-        self.findChild(QAction, 'actionWorksheetColumns').triggered.connect(self.open_worksheetColumns_window)
 
         self.menu_file = self.findChild(QMenu, "menuFile")
         set_recent_menu_rebuild_callback(self.rebuild_recent_worksheet_menu)
@@ -275,17 +275,6 @@ class main_window(QMainWindow):
             self.setEnabled(True)
             rt.end_action()
 
-    def open_worksheetColumns_window(self):
-        # Uses a separate guard so it can coexist with other actions.
-        if rt.worksheetColumns_in_progress:
-            return
-        rt.worksheetColumns_in_progress = True
-        try:
-            dialog = window_worksheetColumns(self)
-            dialog.exec()
-        finally:
-            rt.worksheetColumns_in_progress = False
-
     def open_preferences(self):
         if not rt.try_begin_action():
             return
@@ -381,10 +370,22 @@ class main_window(QMainWindow):
             if file_dialog.exec() == QFileDialog.DialogCode.Accepted:
                 file_path = file_dialog.selectedFiles()[0]
                 try:
-                    create_pubsheet_worksheet(file_path, settings=rt.settings)
+                    if rt.settings.get("worksheet_count", 0) > 0:
+                        create_pubsheet_worksheet(file_path, settings=rt.settings)
+                    else:
+                        if not os.path.isfile(pubsheetinitial_path):
+                            raise FileNotFoundError(
+                                f"Tutorial worksheet template not found: {pubsheetinitial_path}"
+                            )
+                        shutil.copyfile(pubsheetinitial_path, file_path)
                     self.save_success_dialog(file_path)
                 except Exception as e:
-                    QMessageBox.critical(self, "Error", f"Failed to save file: {str(e)}")
+                    error_text = (
+                        format_excel_operation_error(e)
+                        if rt.settings.get("worksheet_count", 0) > 0
+                        else str(e)
+                    )
+                    QMessageBox.critical(self, "Error", f"Failed to save file: {error_text}")
         finally:
             self.setEnabled(True)
             rt.end_action()
@@ -584,7 +585,11 @@ class main_window(QMainWindow):
         self._close_nbib_dialog()
         self.setEnabled(True)
         rt.end_action()
-        dialog_onebutton(self, f"Failed to import nbib file:\n{message}", "Error")
+        dialog_onebutton(
+            self,
+            f"Failed to import nbib file:\n{format_excel_operation_error(message)}",
+            "Error",
+        )
 
     def run_check_file_exist2(self):
         if not rt.try_begin_action():
@@ -603,7 +608,14 @@ class main_window(QMainWindow):
             timer.start(500)
             message = self.check_file_exist2()
             if message:
-                dialog_onebutton(self.dialog, str(message), "Confirmation")
+                if isinstance(message, BaseException):
+                    dialog_onebutton(
+                        self.dialog,
+                        format_excel_operation_error(message),
+                        "Error",
+                    )
+                else:
+                    dialog_onebutton(self.dialog, str(message), "Confirmation")
         finally:
             self.dialog.close()
             self.setEnabled(True)
@@ -626,7 +638,14 @@ class main_window(QMainWindow):
             timer.start(500)
             message = self.input_pubmed_data2()
             if message:
-                dialog_onebutton(self.dialog, str(message), "Confirmation")
+                if isinstance(message, BaseException):
+                    dialog_onebutton(
+                        self.dialog,
+                        format_excel_operation_error(message),
+                        "Error",
+                    )
+                else:
+                    dialog_onebutton(self.dialog, str(message), "Confirmation")
         finally:
             self.dialog.close()
             self.setEnabled(True)

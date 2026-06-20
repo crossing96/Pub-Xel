@@ -694,7 +694,13 @@ Combinations of Ctrl, Alt, Shift, and alphabets (a~z) are allowed.
        <item>
         <widget class="QLabel" name="label_worksheet">
          <property name="text">
-          <string>Worksheet columns for PubMed import. Copy names from the list below and paste into row 1 of your worksheet.</string>
+          <string>Columns for Pub-Xel Worksheets
+
+Check the columns you want below. New worksheets created by Pub-Xel will include those columns automatically.
+
+To update an existing worksheet, copy column names from the list and paste them into row 1.
+
+You can use any combination of columns—only &quot;Ref&quot; (PMID) is required; all others are optional.</string>
          </property>
          <property name="wordWrap">
           <bool>true</bool>

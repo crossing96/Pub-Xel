@@ -10,7 +10,7 @@ from pubxel_core.ui.helpers import (
 )
 from pubxel_core.ui.main_window import main_window
 from pubxel_core.ui.preferences import window_preferences
-from pubxel_core.ui.widgets import window_about, window_inspect, window_worksheetColumns
+from pubxel_core.ui.widgets import window_about, window_inspect
 from pubxel_core.ui.workers import check_shortcut, excelWorker, listenerWorker
 
 __all__ = [
@@ -27,5 +27,4 @@ __all__ = [
     "window_about",
     "window_inspect",
     "window_preferences",
-    "window_worksheetColumns",
 ]

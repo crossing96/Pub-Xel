@@ -432,7 +432,7 @@ class window_preferences(QDialog):
             "Citation": True,
             "IF2025": True,
         }
-        locked_on = {"Ref", "Title"}
+        locked_on = {"Ref"}
         settings_enabled = self.settings.get("worksheet_column_enabled", {})
         self.worksheet_column_checks = {}
 
@@ -568,7 +568,6 @@ class window_preferences(QDialog):
                 for name, checkbox in self.worksheet_column_checks.items()
             }
             worksheet_column_enabled["Ref"] = 1
-            worksheet_column_enabled["Title"] = 1
             new_settings["worksheet_column_enabled"] = worksheet_column_enabled
 
         # Developer mode (restart required). Only persist when the checkbox is visible.

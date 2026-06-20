@@ -13,16 +13,12 @@ logger = logging.getLogger(__name__)
 main_path = os.path.join(ui_dir, "main.ui")
 inspect_path = os.path.join(ui_dir, "inspect.ui")
 about_path = os.path.join(ui_dir, "about.ui")
-worksheetColumns_path = os.path.join(ui_dir, "worksheetColumns.ui")
 preferences_path = os.path.join(ui_dir, "preferences.ui")
 icon_path = os.path.join(assets_dir, "logo64.ico")
 questionmark_icon_path = os.path.join(assets_dir, "questionmark.png")
 loading_image_path = os.path.join(assets_dir, "loading.png")
 settingsdefault_path = os.path.join(data_dir, "settingsdefault.json")
 pubsheet_no_columns_path = os.path.join(data_dir, "pubsheet_no_columns.xlsx")
-pubsheetinitialdefault_path = os.path.join(data_dir, "pubsheetinitial.xlsx")
-pubsheet_path = os.path.join(appdatadir, "pubsheet.xlsx")
-pubsheetinitial_path = os.path.join(appdatadir, "pubsheetinitial.xlsx")
 
 # Populated by pubxel_core.app.bootstrap() before the main window is shown
 app = None
@@ -36,7 +32,6 @@ system_tray_notice_shown = 0
 developerMode = 0
 
 action_in_progress = False
-worksheetColumns_in_progress = False
 force_quit = False
 
 listeners = []

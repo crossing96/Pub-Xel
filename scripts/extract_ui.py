@@ -70,11 +70,10 @@ SECTIONS = {
 RUNTIME_NAMES = {
     "settings", "mainlibdir", "seclibdir", "outdir", "os_name",
     "mainlibdirdefault", "outdirdefault", "system_tray_notice_shown",
-    "developerMode", "action_in_progress", "worksheetColumns_in_progress",
+    "developerMode", "action_in_progress",
     "force_quit", "listeners", "app",
-    "main_path", "inspect_path", "about_path", "worksheetColumns_path",
+    "main_path", "inspect_path", "about_path",
     "preferences_path", "icon_path", "questionmark_icon_path", "loading_image_path",
-    "pubsheet_path", "pubsheetinitial_path",
 }
 
 def transform(body: str) -> str:

@@ -15,6 +15,40 @@ from pubxel_core.recent_worksheets import register_recent_worksheet
 from pubxel_core.settings import save_settings_key
 
 
+EXCEL_UNAVAILABLE_HINT = (
+    "\n\nThis may be because a full version of Microsoft Excel is not available. "
+    "Please check that Excel is installed and licensed."
+)
+
+# User-facing guidance from Excel selection/validation — not an Excel install issue.
+_EXCEL_USER_GUIDANCE_PREFIXES = (
+    "Please open the Excel Worksheet first.",
+    "No selection made",
+    "Please select ",
+    "Error: Please ensure the following",
+    "Error: Multiple 'ref' columns",
+    "No worksheet columns selected",
+    "No PubMed ID",
+    "No PubMed metadata",
+    "Template not found",
+    "Tutorial worksheet template not found",
+    "Template is missing expected column",
+    "Template worksheet must contain",
+)
+
+
+def format_excel_operation_error(exc: BaseException | str) -> str:
+    """Append Excel availability guidance for likely COM / xlwings failures."""
+    message = str(exc).strip() or exc.__class__.__name__
+    if isinstance(exc, FileNotFoundError):
+        return message
+    if any(message.startswith(prefix) for prefix in _EXCEL_USER_GUIDANCE_PREFIXES):
+        return message
+    if EXCEL_UNAVAILABLE_HINT.strip() in message:
+        return message
+    return message + EXCEL_UNAVAILABLE_HINT
+
+
 def _get_sep(p):
     if isinstance(p, bytes):
         return b"\\" if os.name == "nt" else b"/"

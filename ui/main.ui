@@ -480,8 +480,6 @@
      <string>About</string>
     </property>
     <addaction name="actionAbout"/>
-    <addaction name="separator"/>
-    <addaction name="actionWorksheetColumns"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
@@ -531,11 +529,6 @@
   <action name="actionRecent">
    <property name="text">
     <string>Recent</string>
-   </property>
-  </action>
-  <action name="actionWorksheetColumns">
-   <property name="text">
-    <string>View Worksheet Columns</string>
    </property>
   </action>
   <action name="actionOpen">
