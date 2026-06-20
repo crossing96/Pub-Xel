@@ -7,8 +7,9 @@ Pub-Xel™ is a reference management software designed to integrate seamlessly w
 2. Run the installer to set up **Pub-Xel** on your system.
 
 ## Compatibility
-🖥 **Currently available for Windows only**.
-MacOS version will be released in public soon!
+🖥 **Windows only** — macOS is not available yet.
+
+User guide: [wiki/Home.md](wiki/Home.md)
 
 ## License
 This project is licensed under the **GNU General Public License v3.0 (GPL-3.0)**.  

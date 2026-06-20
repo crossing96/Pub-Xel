@@ -52,7 +52,7 @@ from pubxel_core.recent_worksheets import (
     remove_recent_worksheet,
     set_recent_menu_rebuild_callback,
 )
-from pubxel_core.paths import pubsheetinitial_path
+from pubxel_core.paths import pubsheetinitial_path, wiki_url
 from pubxel_core.worksheet_builder import create_filled_worksheet, create_worksheet as create_pubsheet_worksheet
 from pubxel_core.worksheet_export import write_worksheet_tsv
 from pubxel_core.ui.dialogs_extra import (
@@ -173,6 +173,9 @@ class main_window(QMainWindow):
             open_action.triggered.connect(self.open_file_dialog)
         self.findChild(QAction, 'actionPreferences').triggered.connect(self.open_preferences)
         self.findChild(QAction, 'actionAbout').triggered.connect(self.open_about_window)
+        help_action = self.findChild(QAction, 'actionGet_Pub_Xel_help')
+        if help_action is not None:
+            help_action.triggered.connect(self.open_user_guide)
 
         self.menu_file = self.findChild(QMenu, "menuFile")
         set_recent_menu_rebuild_callback(self.rebuild_recent_worksheet_menu)
@@ -274,6 +277,9 @@ class main_window(QMainWindow):
         finally:
             self.setEnabled(True)
             rt.end_action()
+
+    def open_user_guide(self):
+        webbrowser.open(wiki_url)
 
     def open_preferences(self):
         if not rt.try_begin_action():

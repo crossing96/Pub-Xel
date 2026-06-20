@@ -480,6 +480,7 @@
      <string>About</string>
     </property>
     <addaction name="actionAbout"/>
+    <addaction name="actionGet_Pub_Xel_help"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
@@ -508,7 +509,7 @@
   </action>
   <action name="actionGet_Pub_Xel_help">
    <property name="text">
-    <string>Pub-Xel Help</string>
+    <string>User Guide</string>
    </property>
   </action>
   <action name="actionAbout">

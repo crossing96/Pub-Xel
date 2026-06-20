@@ -34,3 +34,5 @@ data_dir = os.path.join(project_dir, "data")
 journal_combined_path = os.path.join(data_dir, "journal_combined_2025.txt")
 pubsheet_all_columns_path = os.path.join(data_dir, "pubsheet_all_columns.xlsx")
 pubsheetinitial_path = os.path.join(data_dir, "pubsheetinitial.xlsx")
+
+wiki_url = "https://pubxel.org/wiki/"
