@@ -1,6 +1,6 @@
 # Clipboard Actions
 
-Copy article IDs (PMIDs) with **Ctrl+C**, then use Pub-Xel to open PDFs or inspect them.
+Copy PMIDs with **Ctrl+C** (e.g., from multiple Excel Worksheet cells), then use Pub-Xel to open PDFs or inspect them.
 
 You can copy from Excel, Word, PubMed, or anywhere you see PMIDs or PubMed links.
 
